@@ -1,0 +1,9 @@
+{
+	"scripts": {
+		"buildcw": "gcc -o dest/lwlaim.exe $(find src -name '*.c') -I\"include\" -L\"linkers\" -lglfw3dll -lglew32 -lopengl32 -lgdi32 -luser32 -lkernel32 -mwindows",
+		"buildc": "gcc -o dest/lwlaim.exe $(find src -name '*.c') -I\"include\" -L\"linkers\" -lglfw3dll -lglew32 -lopengl32 -lgdi32 -luser32 -lkernel32",
+		"dev": "./dest/lwlaim.exe",
+		"bw": "bun buildcw && sleep 0 && bun dev",
+		"b": "bun buildc && sleep 0 && bun dev"
+	}
+}
