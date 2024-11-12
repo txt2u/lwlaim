@@ -7,6 +7,7 @@ typedef struct {
     GLuint VAO;
     GLuint VBO;
     GLuint TexCoordVBO;  // Added for texture coordinates
+    GLuint NormalVBO;  // Added for texture coordinates
     GLuint EBO;
 } Buffers;
 

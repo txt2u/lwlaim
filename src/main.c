@@ -14,6 +14,8 @@
 #include <stdlib.h>
 
 #include "kbd.h"
+#include "mue.h"
+
 #include "shader.h"
 #include "buffers.h"
 #include "qreader.h"
@@ -22,225 +24,264 @@
 #include <stb_image.h>
 
 #include <cglm/cglm.h>
-
 #include "camera.h"
+#include "crosshair.h"
+#include "swp.h"
 
-double xpos, ypos;
-void cursor_pos_callback(GLFWwindow* window, double x_pos, double y_pos) {
-	xpos = x_pos;
-	ypos = y_pos;
-}
+#include "model_loader.h"  // Include the model loader header
+
+Crosshair crosshair;
 
 int main() {
-	// Initialize glfw, if didn't, fprintf and return an error code of -1
-	if(!glfwInit()) {
-		fprintf(stderr, "Failed to initialize glfw!\n");
-		return -1;
-	}
+    // Initialize glfw
+    if(!glfwInit()) {
+        fprintf(stderr, "Failed to initialize glfw!\n");
+        return -1;
+    }
+    printf("GLFW initialized.\n");
 
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-	glfwWindowHint(GLFW_DECORATED, FALSE);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_DECORATED, FALSE);
 
-	GLFWmonitor* primary_monitor = glfwGetPrimaryMonitor();
-	if (!primary_monitor) {
-		fprintf(stderr, "Failed to get primary monitor!\n");
-		glfwTerminate();
-		return -1;
-	}
+    GLFWmonitor* primary_monitor = glfwGetPrimaryMonitor();
+    if (!primary_monitor) {
+        fprintf(stderr, "Failed to get primary monitor!\n");
+        glfwTerminate();
+        return -1;
+    }
 
-	// Get the video mode of the primary monitor
-	const GLFWvidmode* video_mode = glfwGetVideoMode(primary_monitor);
-	if (!video_mode) {
-		fprintf(stderr, "Failed to get video mode!\n");
-		glfwTerminate();
-		return -1;
-	}
+    // Get the video mode of the primary monitor
+    const GLFWvidmode* video_mode = glfwGetVideoMode(primary_monitor);
+    if (!video_mode) {
+        fprintf(stderr, "Failed to get video mode!\n");
+        glfwTerminate();
+        return -1;
+    }
 
-	// Access screen width and height
-	int screen_w = video_mode->width;
-	int screen_h = video_mode->height;
+    // Access screen width and height
+    int screen_w = video_mode->width;
+    int screen_h = video_mode->height;
 
-	// Create a fullscreen-borderless window
-	GLFWwindow* window = glfwCreateWindow(screen_w, screen_h, "lwlaim", NULL, NULL);
+    // Create a fullscreen-borderless window
+    GLFWwindow* window = glfwCreateWindow(screen_w, screen_h, "lwlaim", NULL, NULL);
+    if(!window) {
+        fprintf(stderr, "Failed to create window!\n");
+        glfwTerminate();
+        return -3;
+    }
+    printf("Window created.\n");
 
-	if(!window) {
-		fprintf(stderr, "Failed to create window!\n");
-		glfwTerminate();
-		return -3;
-	}
+    // Create the OpenGL context for the window
+    glfwMakeContextCurrent(window);
 
-	// Create the opengl context for the window
-	glfwMakeContextCurrent(window);
+    glewExperimental = GLU_TRUE;
+    if(glewInit() != GLEW_OK) {
+        fprintf(stderr, "Failed to initialize glew!\n");
+        return -2;
+    }
+    printf("GLEW initialized.\n");
 
-	glewExperimental = GLU_TRUE;
-	if(glewInit() != GLEW_OK) {
-		fprintf(stderr, "Failed to initialize glew!\n");
-		return -2;
-	}
+    // Keyboard and mouse callback functions
+    glfwSetKeyCallback(window, keyboard_callback);
+    glfwSetCursorPosCallback(window, cursor_callback);
 
-	// Keyboard callback function is in kbd.c
-	glfwSetKeyCallback(window, keyboard_callback);
-	// Mouse callback function
-	glfwSetCursorPosCallback(window, cursor_pos_callback);
+    // Compile shaders and create shader program
+    char* vertexShaderSource = read_file("resources/shaders/vertex.glsl");
+    char* fragmentShaderSource = read_file("resources/shaders/fragment.glsl");
+    if (!vertexShaderSource || !fragmentShaderSource) {
+        fprintf(stderr, "Failed to load shader sources!\n");
+        return -5;
+    }
 
-	// Compile shaders and create shader program
-	char* vertexShaderSource = read_file("resources/shaders/vertex.glsl");
-	char* fragmentShaderSource = read_file("resources/shaders/fragment.glsl");
-	if (!vertexShaderSource || !fragmentShaderSource) {
-		fprintf(stderr, "Failed to load shader sources!\n");
-		return -5;
-	}
+    ShaderProgram shader = shader_create(vertexShaderSource, fragmentShaderSource);
+    free(vertexShaderSource);
+    free(fragmentShaderSource);
 
-	ShaderProgram shader = shader_create(vertexShaderSource, fragmentShaderSource);
-	free(vertexShaderSource);
-	free(fragmentShaderSource);
+    if (shader.id == 0) {
+        fprintf(stderr, "Shader program creation failed!\n");
+        return -4;
+    }
+    printf("Shader program created.\n");
 
-	if (shader.id == 0) {
-		fprintf(stderr, "Shader program creation failed!\n");
-		return -4;
-	}
+    // Load the OBJ model
+    Model model;
+    if (!load_obj("resources/models/sphere.obj", &model)) {
+        fprintf(stderr, "Failed to load OBJ file!\n");
+        return -6;
+    }
+    printf("OBJ model loaded.\n");
 
-	float vertices[] = {
-		// Positions
-		-0.5f,  0.5f, 0.0f,
-		0.5f,  0.5f, 0.0f,
-		0.5f, -0.5f, 0.0f,
-		-0.5f, -0.5f, 0.0f
-	};
+    // Create buffers and upload model data to GPU
+    Buffers buffers = buffers_create_empty();
+    buffers_bind_vao(buffers.VAO);
 
-	float tex_coords[] = {
-		// Texture coordinates
-		0.0f, 1.0f,  // Top-left
-		1.0f, 1.0f,  // Top-right
-		1.0f, 0.0f,  // Bottom-right
-		0.0f, 0.0f   // Bottom-left
-	};
+    // Create VBO for vertex positions
+    buffers.VBO = buffers_create_vbo(model.vertices, model.vertex_count * 3);
+    buffers_bind_vbo(buffers.VBO);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
 
-	unsigned int indices[] = { 0, 1, 2, 2, 3, 0 };
+    // Create VBO for texture coordinates
+    if (model.texcoord_count > 0) {
+        buffers.TexCoordVBO = buffers_create_vbo(model.texcoords, model.texcoord_count * 2);
+        buffers_bind_vbo(buffers.TexCoordVBO);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+        glEnableVertexAttribArray(1);
+    }
+    
+    // Create VBO for normals
+    if (model.normal_count > 0) {
+        buffers.NormalVBO = buffers_create_vbo(model.normals, model.normal_count * 3);
+        buffers_bind_vbo(buffers.NormalVBO);
+        glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+        glEnableVertexAttribArray(2);
+    }
 
-	// Create buffers with vertex positions and texture coordinates
-	Buffers buffers = buffers_create_empty();
-	buffers_bind_vao(buffers.VAO);
+    // Create EBO for indices
+    buffers.EBO = buffers_create_ebo(model.indices, model.index_count);
+    buffers_bind_ebo(buffers.EBO);
 
-	// Create VBO for vertex positions
-	buffers.VBO = buffers_create_vbo(vertices, 12);
-	buffers_bind_vbo(buffers.VBO);
+    // Unbind buffers and VAO
+    buffers_unbind_vbo();
+    buffers_unbind_vao();
+    printf("Buffers and VAOs created and bound.\n");
 
-	// Enable the vertex attribute array for position and define it
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);  // Position attribute
-	glEnableVertexAttribArray(0);  // Enable position attribute array
+    // Load the texture
+    GLuint texture;
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
 
-	// Create EBO
-	buffers.EBO = buffers_create_ebo(indices, 6);
-	buffers_bind_ebo(buffers.EBO);
-
-	// Create VBO for texture coordinates
-	buffers.TexCoordVBO = buffers_create_vbo(tex_coords, 8);
-	buffers_bind_vbo(buffers.TexCoordVBO);
-
-	// Enable the vertex attribute array for texture coordinates and define it
-	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);  // Texture coord attribute
-	glEnableVertexAttribArray(1);  // Enable texture coordinate attribute array
-
-	// You can unbind the VBO and VAO after configuring everything
-	buffers_unbind_vbo();
-	buffers_unbind_vao();
-
-	GLuint texture;
-	glGenTextures(1, &texture);
-	glBindTexture(GL_TEXTURE_2D, texture);
+	stbi_set_flip_vertically_on_load(1);
 
 	int width, height, nrChannels;
 	unsigned char *data = stbi_load("resources/prototype/image.jpg", &width, &height, &nrChannels, 0);
 	if (data) {
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+		// Check if the image has an alpha channel (RGBA)
+		GLenum format = GL_RGB;
+		if (nrChannels == 4) {
+			format = GL_RGBA;  // Use RGBA format for textures with an alpha channel
+		}
+
+		// Create the texture
+		glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+
+		// Generate mipmaps for better performance at various distances
 		glGenerateMipmap(GL_TEXTURE_2D);
 
-		// Texture parameters
+		// Set texture parameters
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+		printf("Texture loaded with %d channels.\n", nrChannels);  // Output channel info
 	} else {
 		fprintf(stderr, "Failed to load texture!\n");
-		return -6;
+		return -7;
 	}
 	stbi_image_free(data);
 
-	Camera camera;
+    Camera camera;
     camera_init(&camera, (vec3){0.0f, 0.0f, 3.0f}, (vec3){0.0f, 1.0f, 0.0f}, -90.0f, 0.0f);
+    printf("Camera initialized.\n");
 
     float deltaTime = 0.0f, lastFrame = 0.0f;
     mat4 view, projection;
 
-	glfwSwapInterval(1);
+    glEnable(GL_DEPTH_TEST);
 
-	// Main loop
-	while (!glfwWindowShouldClose(window)) {
-		float currentFrame = glfwGetTime();
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    glEnable(GL_CULL_FACE);  // Enable back-face culling
+    glCullFace(GL_BACK);     // Cull the back faces (if not front-facing)
+    glFrontFace(GL_CCW);     // Set front face counter-clockwise (default)
+
+    glfwSwapInterval(0);
+
+	vec3 crosshairColor = {1.0f, 1.0f, 0.0f}; // White color
+    float crosshairSize = 2.0f; // Adjust crosshair size as needed
+    float crosshairThickness = 4.0f; // Adjust crosshair size as needed
+    crosshair_init(&crosshair, crosshairSize, crosshairThickness, crosshairColor);
+
+	Ray ray;
+
+    // Main loop
+    while (!glfwWindowShouldClose(window)) {
+        float currentFrame = glfwGetTime();
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
 
-		glfwPollEvents();
+        glfwPollEvents();
 
-		// Get framebuffer size
-		int framebufferWidth, framebufferHeight;
-		glfwGetFramebufferSize(window, &framebufferWidth, &framebufferHeight);
-
-		// Set the viewport to cover the entire framebuffer
-		glViewport(0, 0, framebufferWidth, framebufferHeight);
+        // Get framebuffer size
+        int framebufferWidth, framebufferHeight;
+        glfwGetFramebufferSize(window, &framebufferWidth, &framebufferHeight);
+        glViewport(0, 0, framebufferWidth, framebufferHeight);
 
         // Handle input
         camera_process_keyboard(&camera, window, deltaTime);
-		camera_process_mouse(&camera, xpos, ypos);
+        camera_process_mouse(&camera, cursor_x_position, cursor_y_position);
 
-		// Use the shader program
-		shader_use(&shader);
+        // Use the shader program
+        shader_use(&shader);
 
-		camera_update(&camera);
+		glClear(GL_COLOR_BUFFER_BIT);
+		glClear(GL_DEPTH_BUFFER_BIT);
+		
+		// Render the scene
+        camera_update(&camera);
 
-		// Set up the MVP matrices
-        mat4 model = GLM_MAT4_IDENTITY_INIT;
-        camera_get_view_matrix(&camera, view);  // Pass the view matrix to be updated
-        camera_get_projection_matrix(&camera, projection, framebufferWidth, framebufferHeight);  // Pass the projection matrix
+        // Set up the MVP matrices
+        mat4 modelMatrix = GLM_MAT4_IDENTITY_INIT;
+        camera_get_view_matrix(&camera, view);
+        camera_get_projection_matrix(&camera, projection, framebufferWidth, framebufferHeight);
 
-        // Render the scene
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		screen_to_ray(
+			framebufferWidth/2, framebufferHeight/2, 
+			framebufferWidth, framebufferHeight, 
+			view, projection, &ray);
 
         GLint modelLoc = glGetUniformLocation(shader.id, "model");
         GLint viewLoc = glGetUniformLocation(shader.id, "view");
         GLint projectionLoc = glGetUniformLocation(shader.id, "projection");
 
-        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, (const GLfloat*)model);
+        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, (const GLfloat*)modelMatrix);
         glUniformMatrix4fv(viewLoc, 1, GL_FALSE, (const GLfloat*)view);
         glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, (const GLfloat*)projection);
 
-		// Bind texture to texture unit 0
-		buffers_bind_vbo(buffers.TexCoordVBO);
-		GLuint textureLocation = glGetUniformLocation(shader.id, "texture1");
-		glUniform1i(textureLocation, 0); // Tell shader to use texture unit 0
-		glActiveTexture(GL_TEXTURE0);    // Activate texture unit 0
-		glBindTexture(GL_TEXTURE_2D, texture);
+        // Bind texture to texture unit 0
+        GLuint textureLocation = glGetUniformLocation(shader.id, "texture1");
+        glUniform1i(textureLocation, 0); // Tell shader to use texture unit 0
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, texture);
 
-		// Bind buffers and draw
-		buffers_bind_vao(buffers.VAO);
-		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-		buffers_unbind_vao();
+        // Bind buffers and draw
+        buffers_bind_vao(buffers.VAO);
+        glDrawElements(GL_TRIANGLES, model.index_count, GL_UNSIGNED_INT, 0);
+        buffers_unbind_vao();
+		buffers_unbind_vbo();
+		buffers_unbind_ebo();
 
-		// Swap buffers
-		glfwSwapBuffers(window);
-	}
+		crosshair_render(&crosshair, framebufferWidth, framebufferHeight);
 
-	// Clean up resources
-	shader_destroy(&shader);
-	buffers_destroy(&buffers);
-	glDeleteTextures(1, &texture);
+        // Swap buffers
+        glfwSwapBuffers(window);
+    }
 
-	// Cleanup
-	glfwDestroyWindow(window);
-	glfwTerminate();
+    // Clean up resources
+	crosshair_destroy(&crosshair);
+    shader_destroy(&shader);
+    buffers_destroy(&buffers);
+    glDeleteTextures(1, &texture);
+    printf("Resources cleaned up.\n");
 
-	return 0;
+    // Close window and terminate
+    glfwDestroyWindow(window);
+    glfwTerminate();
+    printf("GLFW terminated.\n");
+
+    return 0;
 }
