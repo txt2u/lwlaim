@@ -231,7 +231,8 @@ int main() {
 
 	// Initialize Font
     Font font;
-    font_init(&font, "resources/opensans-light.ttf", 22.0f, text_shader.id);  // Adjust path and size as needed
+	float font_size = 24.0f;
+    font_init(&font, "resources/helvetica.ttf", font_size, text_shader.id);  // Adjust path and size as needed
 
     // Variables to calculate FPS
 	float frameCount = 0;
@@ -302,12 +303,6 @@ int main() {
 		buffers_unbind_vbo();
 		buffers_unbind_ebo();
 
-		crosshair_render(&crosshair, framebufferWidth, framebufferHeight);
-
-		buffers_unbind_vao();
-		buffers_unbind_vbo();
-		buffers_unbind_ebo();
-
 		// Use text shader program
 		shader_use(&text_shader);
 
@@ -320,11 +315,17 @@ int main() {
 
 		// Render info text
 		font_render_text(&font, "lwlaim beta v0.0", 4.0f, 0.0f, color);
-		font_render_text(&font, "lightweight aim training", 4.0f, 24.0f, color);
+		font_render_text(&font, "lightweight aim training", 4.0f, (font_size + 2.0f), color);
 		// Render FPS text
 		char fpsText[32];
 		snprintf(fpsText, sizeof(fpsText), "frames per second: %.0f", fps);
-		font_render_text(&font, fpsText, 4.0f, 46.0f, color); // Display at top-left
+		font_render_text(&font, fpsText, 4.0f, ((font_size * 2.0f) + 2.0f), color); // Display at top-left
+
+		crosshair_render(&crosshair, framebufferWidth, framebufferHeight);
+
+		buffers_unbind_vao();
+		buffers_unbind_vbo();
+		buffers_unbind_ebo();
 
 		// Swap buffers
 		glfwSwapBuffers(window);

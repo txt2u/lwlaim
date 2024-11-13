@@ -50,8 +50,6 @@ void crosshair_render(Crosshair *crosshair, int screenWidth, int screenHeight) {
     shader_use(&crosshair->shader);
 
     glDisable(GL_DEPTH_TEST);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     mat4 projection;
     glm_ortho(0.0f, (float)screenWidth, (float)screenHeight, 0.0f, -1.0f, 1.0f, projection);
@@ -71,7 +69,6 @@ void crosshair_render(Crosshair *crosshair, int screenWidth, int screenHeight) {
     buffers_unbind_vao();
 
     glEnable(GL_DEPTH_TEST);
-    glDisable(GL_BLEND);
 }
 
 // Clean up crosshair resources, including the shader

@@ -86,9 +86,11 @@ void font_init(Font *font, const char *font_path, float font_size, GLuint shader
             font->characters[c].x_offset = x_offset;
             font->characters[c].y_offset = y_offset;
 
-            int advance;
-            stbtt_GetCodepointHMetrics(&info, c, &advance, NULL);
-            font->characters[c].advance = (int)(advance * scale);
+
+			int advanceWidth, leftSideBearing;
+			stbtt_GetCodepointHMetrics(&info, c, &advanceWidth, &leftSideBearing);
+			float scaledAdvance = advanceWidth * scale;
+			font->characters[c].advance = scaledAdvance;
 
             stbtt_FreeBitmap(bitmap, NULL); // Free bitmap data after texture creation
         } else {
@@ -153,13 +155,15 @@ void font_render_text(Font *font, const char *text, float x, float y, vec3 color
         glDisable(GL_CULL_FACE); // Disable depth test while rendering 2D text
         glDisable(GL_DEPTH_TEST); // Disable face culling while rendering 2D text
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL); // Disable wireframe mode (render in solid mode)
+
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4); // Use triangle strip (faster than 2 triangles)
+
         glEnable(GL_DEPTH_TEST); // Re-enable depth test after rendering
 
 		if(wireframeMode) glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); // Re-enable wireframe mode
 		if(!cullingMode) glEnable(GL_CULL_FACE); // Re-enable face culling after rendering
 
-        x += (ch.width + 2.0f);
+		x += ch.advance;
     }
 
     glBindVertexArray(0);
