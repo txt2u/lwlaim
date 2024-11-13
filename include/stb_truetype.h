@@ -326,7 +326,7 @@ void my_stbtt_print(float x, float y, char *text)
 //
 #if 0
 #include <stdio.h>
-#define STB_TRUETYPE_IMPLEMENTATION  // force following include to generate implementation
+#define 1  // force following include to generate implementation
 #include "stb_truetype.h"
 
 char ttf_buffer[1<<25];

@@ -7,9 +7,6 @@
 #include <GLFW/glfw3.h>
 #include <GLFW/glfw3native.h>
 
-#define STB_TRUETYPE_IMPLEMENTATION
-#include <stb_truetype.h>
-
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -29,6 +26,8 @@
 #include "swp.h"
 
 #include "model_loader.h"  // Include the model loader header
+#include "text.h"
+#include "text_projection.h"
 
 Crosshair crosshair;
 
@@ -44,6 +43,7 @@ int main() {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_DECORATED, FALSE);
+	glfwWindowHint(GLFW_SAMPLES, 16);
 
     GLFWmonitor* primary_monitor = glfwGetPrimaryMonitor();
     if (!primary_monitor) {
@@ -103,7 +103,7 @@ int main() {
         fprintf(stderr, "Shader program creation failed!\n");
         return -4;
     }
-    printf("Shader program created.\n");
+    printf("Main shader program created.\n");
 
     // Load the OBJ model
     Model model;
@@ -188,10 +188,11 @@ int main() {
     printf("Camera initialized.\n");
 
     float deltaTime = 0.0f, lastFrame = 0.0f;
-    mat4 view, projection;
+    mat4 view, projection, text_projection;
+	
 
     glEnable(GL_DEPTH_TEST);
-
+	glEnable(GL_MULTISAMPLE);
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
@@ -207,71 +208,130 @@ int main() {
     crosshair_init(&crosshair, crosshairSize, crosshairThickness, crosshairColor);
 
 	Ray ray;
+	vec3 color = {1.0f, 1.0f, 1.0f};  // White color
 
-    // Main loop
-    while (!glfwWindowShouldClose(window)) {
-        float currentFrame = glfwGetTime();
-        deltaTime = currentFrame - lastFrame;
-        lastFrame = currentFrame;
+	// Initialize text renderer
+	// Compile shaders and create shader program
+    char* t_vertexShaderSource = read_file("resources/shaders/text/vertex.glsl");
+    char* t_fragmentShaderSource = read_file("resources/shaders/text/fragment.glsl");
+    if (!t_vertexShaderSource || !t_fragmentShaderSource) {
+        fprintf(stderr, "Failed to load text shader sources!\n");
+        return -5;
+    }
 
-        glfwPollEvents();
+	ShaderProgram text_shader = shader_create(t_vertexShaderSource, t_fragmentShaderSource);
+    free(t_vertexShaderSource);
+    free(t_fragmentShaderSource);
 
-        // Get framebuffer size
-        int framebufferWidth, framebufferHeight;
-        glfwGetFramebufferSize(window, &framebufferWidth, &framebufferHeight);
-        glViewport(0, 0, framebufferWidth, framebufferHeight);
+    if (text_shader.id == 0) {
+        fprintf(stderr, "Shader program creation failed!\n");
+        return -4;
+    }
+    printf("Text shader program created.\n");
 
-        // Handle input
-        camera_process_keyboard(&camera, window, deltaTime);
-        camera_process_mouse(&camera, cursor_x_position, cursor_y_position);
+	// Initialize Font
+    Font font;
+    font_init(&font, "resources/opensans-light.ttf", 22.0f, text_shader.id);  // Adjust path and size as needed
 
-        // Use the shader program
-        shader_use(&shader);
+    // Variables to calculate FPS
+	float frameCount = 0;
+	float lastTime = 0.0f;
+	float fps = 0.0f;
+
+	while (!glfwWindowShouldClose(window)) {
+		float currentFrame = glfwGetTime();
+		deltaTime = currentFrame - lastFrame;
+		lastFrame = currentFrame;
+
+		glfwPollEvents();
+
+		// Calculate FPS every second
+		frameCount++;
+		if (currentFrame - lastTime >= 1.0f) { // If one second has passed
+			fps = frameCount;
+			frameCount = 0;
+			lastTime = currentFrame;
+		}
+
+		// Get framebuffer size
+		int framebufferWidth, framebufferHeight;
+		glfwGetFramebufferSize(window, &framebufferWidth, &framebufferHeight);
+		glViewport(0, 0, framebufferWidth, framebufferHeight);
+
+		// Handle input
+		camera_process_keyboard(&camera, window, deltaTime);
+		camera_process_mouse(&camera, cursor_x_position, cursor_y_position);
+
+		// Use the shader program
+		shader_use(&shader);
 
 		glClear(GL_COLOR_BUFFER_BIT);
 		glClear(GL_DEPTH_BUFFER_BIT);
-		
-		// Render the scene
-        camera_update(&camera);
 
-        // Set up the MVP matrices
-        mat4 modelMatrix = GLM_MAT4_IDENTITY_INIT;
-        camera_get_view_matrix(&camera, view);
-        camera_get_projection_matrix(&camera, projection, framebufferWidth, framebufferHeight);
+		// Render the scene
+		camera_update(&camera);
+
+		// Set up the MVP matrices
+		mat4 modelMatrix = GLM_MAT4_IDENTITY_INIT;
+		camera_get_view_matrix(&camera, view);
+		camera_get_projection_matrix(&camera, projection, framebufferWidth, framebufferHeight);
 
 		screen_to_ray(
 			framebufferWidth/2, framebufferHeight/2, 
 			framebufferWidth, framebufferHeight, 
 			view, projection, &ray);
 
-        GLint modelLoc = glGetUniformLocation(shader.id, "model");
-        GLint viewLoc = glGetUniformLocation(shader.id, "view");
-        GLint projectionLoc = glGetUniformLocation(shader.id, "projection");
+		GLint modelLoc = glGetUniformLocation(shader.id, "model");
+		GLint viewLoc = glGetUniformLocation(shader.id, "view");
+		GLint projectionLoc = glGetUniformLocation(shader.id, "projection");
 
-        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, (const GLfloat*)modelMatrix);
-        glUniformMatrix4fv(viewLoc, 1, GL_FALSE, (const GLfloat*)view);
-        glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, (const GLfloat*)projection);
+		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, (const GLfloat*)modelMatrix);
+		glUniformMatrix4fv(viewLoc, 1, GL_FALSE, (const GLfloat*)view);
+		glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, (const GLfloat*)projection);
 
-        // Bind texture to texture unit 0
-        GLuint textureLocation = glGetUniformLocation(shader.id, "texture1");
-        glUniform1i(textureLocation, 0); // Tell shader to use texture unit 0
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, texture);
+		// Bind texture to texture unit 0
+		GLuint textureLocation = glGetUniformLocation(shader.id, "texture1");
+		glUniform1i(textureLocation, 0); // Tell shader to use texture unit 0
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, texture);
 
-        // Bind buffers and draw
-        buffers_bind_vao(buffers.VAO);
-        glDrawElements(GL_TRIANGLES, model.index_count, GL_UNSIGNED_INT, 0);
-        buffers_unbind_vao();
+		// Bind buffers and draw
+		buffers_bind_vao(buffers.VAO);
+		glDrawElements(GL_TRIANGLES, model.index_count, GL_UNSIGNED_INT, 0);
+		buffers_unbind_vao();
 		buffers_unbind_vbo();
 		buffers_unbind_ebo();
 
 		crosshair_render(&crosshair, framebufferWidth, framebufferHeight);
 
-        // Swap buffers
-        glfwSwapBuffers(window);
-    }
+		buffers_unbind_vao();
+		buffers_unbind_vbo();
+		buffers_unbind_ebo();
+
+		// Use text shader program
+		shader_use(&text_shader);
+
+		// Text projection setup
+		setup_text_projection(framebufferWidth, framebufferHeight, text_projection);
+
+		// Set projection matrix in shader
+		GLuint proj_loc = glGetUniformLocation(font.shader_program, "projection");
+		glUniformMatrix4fv(proj_loc, 1, GL_FALSE, (const GLfloat*)text_projection);
+
+		// Render info text
+		font_render_text(&font, "lwlaim beta v0.0", 4.0f, 0.0f, color);
+		font_render_text(&font, "lightweight aim training", 4.0f, 24.0f, color);
+		// Render FPS text
+		char fpsText[32];
+		snprintf(fpsText, sizeof(fpsText), "frames per second: %.0f", fps);
+		font_render_text(&font, fpsText, 4.0f, 46.0f, color); // Display at top-left
+
+		// Swap buffers
+		glfwSwapBuffers(window);
+	}
 
     // Clean up resources
+	font_cleanup(&font);
 	crosshair_destroy(&crosshair);
     shader_destroy(&shader);
     buffers_destroy(&buffers);
