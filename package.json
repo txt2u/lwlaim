@@ -1,12 +1,12 @@
 {
 	"scripts": {
-		"buildcw": "gcc -O2 -flto -ffunction-sections -fdata-sections -pipe -march=native -o dest/lwlaim.exe $(find src -name '*.c') -I\"include\" -L\"linkers\" -lglfw3dll -lglew32 -lopengl32 -lgdi32 -luser32 -lkernel32 -Wl,--gc-sections -mwindows",
-		"buildc": "gcc -O2 -flto -ffunction-sections -fdata-sections -pipe -march=native -o dest/lwlaim.exe $(find src -name '*.c') -I\"include\" -L\"linkers\" -lglfw3dll -lglew32 -lopengl32 -lgdi32 -luser32 -lkernel32 -Wl,--gc-sections",
+		"buildcw": "gcc -O3 -flto -ffunction-sections -fdata-sections -pipe -march=native -mtune=native -o dest/lwlaim.exe $(find src -name '*.c') -I\"include\" -L\"linkers\" -lglfw3dll -lglew32 -lopengl32 -lgdi32 -luser32 -lkernel32 -Wl,--gc-sections -s -fuse-linker-plugin -Wl,--strip-all -mwindows && upx -9 --lzma --best dest/lwlaim.exe",
+		"buildc": "gcc -O3 -flto -ffunction-sections -fdata-sections -pipe -march=native -mtune=native -o dest/lwlaim.exe $(find src -name '*.c') -I\"include\" -L\"linkers\" -lglfw3dll -lglew32 -lopengl32 -lgdi32 -luser32 -lkernel32 -Wl,--gc-sections -s -fuse-linker-plugin -Wl,--strip-all && upx -9 --lzma --best dest/lwlaim.exe",
 		"cr": "[ -d dest/resources ] && rm -r dest/resources; cp -R resources dest/resources",
 		"crw": "[ ! -d dest ] && mkdir -p dest; find windll -type f -exec bash -c 'if [ ! -e \"dest/$(basename \"{}\")\" ]; then cp \"{}\" dest/; fi' \\;",
 		"dev": "./dest/lwlaim.exe",
-		"bw": "bun cr && bun crw && bun buildcw && sleep 0 && bun dev",
-		"bwm": "bun cr && bun crw && bun buildc && sleep 0 && bun dev",
-		"b": "bun cr && bun buildc && sleep 0 && bun dev"
+		"bw": "bun cr && bun crw && bun buildcw && sleep 0 && find dest -type f \\( -name '*.exe' -o -name '*.dll' \\) -exec upx -9 --lzma --best {} \\;",
+		"bwm": "bun cr && bun crw && bun buildc && sleep 0 && find dest -type f \\( -name '*.exe' -o -name '*.dll' \\) -exec upx -9 --lzma --best {} \\;",
+		"b": "bun cr && bun buildc && sleep 0 && find dest -type f \\( -name '*.exe' -o -name '*.dll' \\) -exec upx -9 --lzma --best {} \\;"
 	}
 }
