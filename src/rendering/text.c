@@ -92,7 +92,6 @@ void font_init(Font *font, const char *font_path, float font_size, GLuint shader
 
             stbtt_FreeBitmap(bitmap, NULL); // Free bitmap data after texture creation
         } else {
-            fprintf(stderr, "Failed to generate bitmap for character %c\n", c);
             font->characters[c].texture_id = 0; // Set to 0 to indicate an invalid texture
         }
     }
