@@ -26,8 +26,10 @@
 #include "swp.h"
 
 #include "model_loader.h"  // Include the model loader header
+#include "ortho_projection.h"
+
+#include "image.h"
 #include "text.h"
-#include "text_projection.h"
 
 Crosshair crosshair;
 
@@ -41,7 +43,7 @@ int main() {
 
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_DECORATED, FALSE);
 	glfwWindowHint(GLFW_SAMPLES, 16);
 
@@ -75,6 +77,9 @@ int main() {
 
     // Create the OpenGL context for the window
     glfwMakeContextCurrent(window);
+
+	const char* version = (const char*)glGetString(GL_VERSION);
+	printf("OpenGL version: %s\n", version);
 
     glewExperimental = GLU_TRUE;
     if(glewInit() != GLEW_OK) {
@@ -188,7 +193,7 @@ int main() {
     printf("Camera initialized.\n");
 
     float deltaTime = 0.0f, lastFrame = 0.0f;
-    mat4 view, projection, text_projection;
+    mat4 view, projection, text_projection, image_projection;
 	
 
     glEnable(GL_DEPTH_TEST);
@@ -229,6 +234,25 @@ int main() {
     }
     printf("Text shader program created.\n");
 
+	// Initialize image renderer
+	// Compile shaders and create shader program
+    char* i_vertexShaderSource = read_file("resources/shaders/image/vertex.glsl");
+    char* i_fragmentShaderSource = read_file("resources/shaders/image/fragment.glsl");
+    if (!t_vertexShaderSource || !t_fragmentShaderSource) {
+        fprintf(stderr, "Failed to load image shader sources!\n");
+        return -5;
+    }
+
+	ShaderProgram image_shader = shader_create(i_vertexShaderSource, i_fragmentShaderSource);
+    free(i_vertexShaderSource);
+    free(i_fragmentShaderSource);
+
+    if (image_shader.id == 0) {
+        fprintf(stderr, "Shader program creation failed!\n");
+        return -4;
+    }
+    printf("Image shader program created.\n");
+
 	// Initialize Font
     Font font;
 	float font_size = 24.0f;
@@ -238,6 +262,13 @@ int main() {
 	float frameCount = 0;
 	float lastTime = 0.0f;
 	float fps = 0.0f;
+
+	// Declare an image
+	Image background_image;
+
+	image_init(&background_image, "resources/prototype/image.jpg", image_shader.id);
+	image_set_dimensions(&background_image, 1024, 1024);
+	printf("Initialized background_image\n");
 
 	while (!glfwWindowShouldClose(window)) {
 		float currentFrame = glfwGetTime();
@@ -293,7 +324,6 @@ int main() {
 		// Bind texture to texture unit 0
 		GLuint textureLocation = glGetUniformLocation(shader.id, "texture1");
 		glUniform1i(textureLocation, 0); // Tell shader to use texture unit 0
-		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, texture);
 
 		// Bind buffers and draw
@@ -303,12 +333,26 @@ int main() {
 		buffers_unbind_vbo();
 		buffers_unbind_ebo();
 
+		// Use image shader program
+		shader_use(&image_shader);
+
+		// Ortho projection setup for image
+		setup_ortho_projection(framebufferWidth, framebufferHeight, image_projection);
+		
+		// Set projection matrix in shader
+		GLuint img_proj_loc = glGetUniformLocation(background_image.shader_program, "projection");
+		glUniformMatrix4fv(img_proj_loc, 1, GL_FALSE, (const GLfloat*)image_projection);
+
+		// Render 2D Image (background)
+		image_set_dimensions_by_shader(&background_image, 260.0f, 260.0f);
+		image_set_rotation_by_shader(&background_image, glfwGetTime() * 150.0f);
+		image_render(&background_image, 100.0f, 100.0f); // Render the loaded background image
 		// Use text shader program
 		shader_use(&text_shader);
 
-		// Text projection setup
-		setup_text_projection(framebufferWidth, framebufferHeight, text_projection);
-
+		// Ortho projection setup for text
+		setup_ortho_projection(framebufferWidth, framebufferHeight, text_projection);
+		
 		// Set projection matrix in shader
 		GLuint proj_loc = glGetUniformLocation(font.shader_program, "projection");
 		glUniformMatrix4fv(proj_loc, 1, GL_FALSE, (const GLfloat*)text_projection);

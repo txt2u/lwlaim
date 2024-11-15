@@ -118,7 +118,6 @@ void font_init(Font *font, const char *font_path, float font_size, GLuint shader
 void font_render_text(Font *font, const char *text, float x, float y, vec3 color) {
     glUseProgram(font->shader_program);
     glUniform3fv(glGetUniformLocation(font->shader_program, "textColor"), 1, color);
-    glActiveTexture(GL_TEXTURE0);
     glBindVertexArray(font->VAO);
 
     for (const char *p = text; *p; p++) {
