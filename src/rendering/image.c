@@ -1,6 +1,7 @@
 #include "image.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <stb_image.h>
 #include "buffers.h"
 #include "kbd.h"
@@ -124,6 +125,36 @@ void image_set_rotation_by_shader(Image *image, float angle_degrees) {
     glUniformMatrix4fv(model_location, 1, GL_FALSE, (const GLfloat *)model);
 }
 
+void image_set_rotation_by_shader_dirty(Image *image, float angle_degrees) {
+    if (image == NULL || image->shader_program == 0) {
+        fprintf(stderr, "Error: Invalid image or shader program.\n");
+        return;
+    }
+
+    // Convert the angle from degrees to radians
+    float angle_radians = glm_rad(angle_degrees);
+
+    // Create the rotation matrix using cglm
+    mat4 model;
+    glm_mat4_identity(model);
+    glm_rotate_z(model, angle_radians, model); // Rotate around Z-axis
+
+	image->rotation = angle_radians;
+	image->model_dirty = true;
+
+    // Get the location of the model matrix uniform in the shader
+    GLuint model_location = glGetUniformLocation(image->shader_program, "model");
+    if (model_location == -1) {
+        fprintf(stderr, "Error: Could not find 'model' uniform.\n");
+        return;
+    }
+
+    // Send the model matrix to the shader
+    glUseProgram(image->shader_program);
+    glUniformMatrix4fv(model_location, 1, GL_FALSE, (const GLfloat *)model);
+}
+
+
 // Function to change dimensions by altering the model matrix in the shader
 void image_set_dimensions_by_shader(Image *image, float new_width, float new_height) {
     if (image == NULL || image->shader_program == 0) {
@@ -159,7 +190,7 @@ void image_render(Image *image, float x, float y) {
 
     glUseProgram(image->shader_program);  // Use the shader program
 
-    // Set the texture uniform (assuming texture_sampler is a valid uniform)
+    // Set the texture uniform
     GLuint texture_location = glGetUniformLocation(image->shader_program, "texture_sampler");
     if (texture_location == -1) {
         fprintf(stderr, "Error: Could not find 'texture_sampler' uniform.\n");
@@ -171,16 +202,32 @@ void image_render(Image *image, float x, float y) {
     glActiveTexture(GL_TEXTURE0);  // Make sure texture unit 0 is active
     glBindTexture(GL_TEXTURE_2D, image->texture_id);
 
-    // Prepare the model matrix for scaling and translation
+    // Always update the model matrix
     mat4 model;
     glm_mat4_identity(model);  // Initialize to identity matrix
-    glm_translate(model, (vec3){x, y, 0.0f});  // Apply translation
-    glm_scale(model, (vec3){image->width, image->height, 1.0f});  // Apply scaling
-	glm_rotate_z(model, image->rotation, model); // Rotate around Z-axis
+
+    if (image->model_dirty) {
+        // Only center the rotation if the image is dirty
+        glm_translate(model, (vec3){x + image->width / 2.0f, y + image->height / 2.0f, 0.0f});  // Move to center
+        glm_rotate_z(model, image->rotation, model); // Apply rotation around the center
+        glm_translate(model, (vec3){-image->width / 2.0f, -image->height / 2.0f, 0.0f}); // Move back to original position
+    } else {
+        // Apply normal translation (without centering)
+        glm_translate(model, (vec3){x, y, 0.0f});  // Apply normal translation for rendering
+    }
+
+    // Apply scaling
+    glm_scale(model, (vec3){image->width, image->height, 1.0f});
 
     // Set the model matrix in the shader
     GLuint model_location = glGetUniformLocation(image->shader_program, "model");
-    glUniformMatrix4fv(model_location, 1, GL_FALSE, (const GLfloat*)model);
+    if (model_location != -1) {
+        glUseProgram(image->shader_program);
+        glUniformMatrix4fv(model_location, 1, GL_FALSE, (const GLfloat*)model);
+    }
+
+    // After updating the model matrix, mark as clean (this flag is optional depending on your workflow)
+    image->model_dirty = false; // Reset the dirty flag after update
 
     // Prepare the vertices (Position and texture coordinates)
     float vertices[4][4] = {
@@ -199,17 +246,17 @@ void image_render(Image *image, float x, float y) {
     if (image->buffers.EBO != 0) {
         buffers_bind_ebo(image->buffers.EBO);  // Use EBO if it exists
     }
-    
-	glDisable(GL_CULL_FACE); // Disable depth test while rendering 2D text
-	glDisable(GL_DEPTH_TEST); // Disable face culling while rendering 2D text
-	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL); // Disable wireframe mode (render in solid mode)
+
+    glDisable(GL_CULL_FACE); // Disable depth test while rendering 2D text
+    glDisable(GL_DEPTH_TEST); // Disable face culling while rendering 2D text
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL); // Render in solid mode
 
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);  // Draw the quad using vertex data
 
-	glEnable(GL_DEPTH_TEST); // Re-enable depth test after rendering
+    glEnable(GL_DEPTH_TEST); // Re-enable depth test after rendering
 
-	if(wireframeMode) glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); // Re-enable wireframe mode
-	if(!cullingMode) glEnable(GL_CULL_FACE); // Re-enable face culling after rendering
+    if (wireframeMode) glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); // Re-enable wireframe mode
+    if (!cullingMode)  glEnable(GL_CULL_FACE); // Re-enable face culling after rendering
 }
 
 void image_cleanup(Image *image) {

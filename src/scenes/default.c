@@ -19,35 +19,35 @@
 
 #include <cglm/cglm.h>
 
-ShaderProgram shader;
-ShaderProgram image_shader;
-ShaderProgram text_shader;
-Buffers buffers;
+static ShaderProgram shader;
+static ShaderProgram image_shader;
+static ShaderProgram text_shader;
+static Buffers buffers;
 
-Crosshair crosshair;
+static Crosshair crosshair;
 
-Model model;
-GLuint texture;
-Camera camera;
+static Model model;
+static GLuint texture;
+static Camera camera;
     
-float deltaTime = 0.0f, lastFrame = 0.0f;
-mat4 view, projection, text_projection, image_projection;
+static float deltaTime = 0.0f, lastFrame = 0.0f;
+static mat4 view, projection, text_projection, image_projection;
 
-vec3 crosshairColor = {1.0f, 1.0f, 0.0f}; // White color
-float crosshairSize = 2.0f; // Adjust crosshair size as needed
-float crosshairThickness = 4.0f; // Adjust crosshair size as needed
+static vec3 crosshairColor = {1.0f, 1.0f, 0.0f}; // White color
+static float crosshairSize = 2.0f; // Adjust crosshair size as needed
+static float crosshairThickness = 4.0f; // Adjust crosshair size as needed
 
-Font font;
-vec3 color = { 1.0f, 1.0f, 1.0f };
-float font_size = 32.0f;
+static Font font;
+static vec3 color = { 1.0f, 1.0f, 1.0f };
+static float font_size = 32.0f;
 
 // Variables to calculate FPS
-float frameCount = 0;
-float lastTime = 0.0f;
-float fps = 0.0f;
+static float frameCount = 0;
+static float lastTime = 0.0f;
+static float fps = 0.0f;
 
 // Declare an image
-Image background_image;
+static Image background_image;
 	
 void default_scene_update(Scene* self) {
 	// Get framebuffer size
@@ -306,6 +306,7 @@ void default_scene_render(Scene* self) {
 
 void default_scene_cleanup() {
 	// Clean up resources
+	image_cleanup(&background_image);
 	font_cleanup(&font);
 	crosshair_destroy(&crosshair);
     shader_destroy(&shader);

@@ -15,7 +15,7 @@
 
 #include "scene.h"
 #include <scenes/default.h>
-
+#include <scenes/splash.h>
 
 int main() {
     // Initialize glfw
@@ -57,7 +57,7 @@ int main() {
         glfwTerminate();
         return -3;
     }
-    printf("Window created.\n");
+    printf("Window was created successfully.\n");
 
     // Create the OpenGL context for the window
     glfwMakeContextCurrent(window);
@@ -93,18 +93,35 @@ int main() {
     main_scene->render = default_scene_render;
     main_scene->cleanup = default_scene_cleanup;
 
+	Scene *splash_screen = scene_create("splash#0", window);
+    scene_state_set(&splash_screen->state, "loaded", "0");
+    splash_screen->update = splash_scene_update;
+    splash_screen->render = splash_scene_render;
+    splash_screen->cleanup = splash_scene_cleanup;
+
+	splash_screen->render(splash_screen);
 	main_scene->render(main_scene);
 
 	while (!glfwWindowShouldClose(window)) {
 		glfwPollEvents();
 
-		main_scene->update(main_scene);
+		// Check the state of the splash screen
+		const char *state_value = scene_state_get(&splash_screen->state, "loaded");
 
-		// Swap buffers
+		if (state_value != NULL && strcmp(state_value, "1") == 0) {
+			// If the state is "1", switch to the main scene
+			main_scene->update(main_scene);
+		} else {
+			// Otherwise, keep showing the splash screen
+			splash_screen->update(splash_screen);
+		}
+
+		// Swap buffers to display the updated scene
 		glfwSwapBuffers(window);
 	}
 
 	main_scene->cleanup(main_scene);
+	splash_screen->cleanup(splash_screen);
 
     // Close window and terminate
     glfwDestroyWindow(window);

@@ -20,6 +20,7 @@ typedef struct {
 } Font;
 
 void font_init(Font *font, const char *font_path, float font_size, GLuint shader_program);
+void font_get_text_dimensions(Font *font, const char *text, float *width, float *height);
 void font_render_text(Font *font, const char *text, float x, float y, vec3 color);
 void font_cleanup(Font *font);
 

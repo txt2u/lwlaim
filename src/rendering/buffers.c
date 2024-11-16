@@ -37,7 +37,7 @@ Buffers buffers_create_empty() {
     buffers_bind_vao(buffers.VAO);
 
     // Unbind buffers to prevent accidental modification
-    buffers_unbind_vao(0);
+    buffers_unbind_vao();
 
     return buffers;
 }

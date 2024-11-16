@@ -6,6 +6,34 @@
 #define STB_TRUETYPE_IMPLEMENTATION
 #include <stb_truetype.h>
 
+static float space_divide_font_by = 6.0f;
+
+void font_get_text_dimensions(Font *font, const char *text, float *width, float *height) {
+    *width = 0.0f;
+    *height = 0.0f;
+
+    float max_height = 0.0f; // Track the maximum height for the text
+
+    for (const char *p = text; *p; p++) {
+        Character ch = font->characters[(unsigned char)*p];
+
+        // Skip the space character
+        if (*p == ' ') {
+            *width += font->size / space_divide_font_by; // Adjust space width as needed
+            continue;
+        }
+
+        // Track the height (max height from any character)
+        if (ch.height > max_height) {
+            max_height = ch.height;
+        }
+
+        *width += ch.advance; // Add character's advance to the total width
+    }
+
+    *height = max_height; // Set the maximum height found
+}
+
 static GLuint create_texture_from_bitmap(const unsigned char *bitmap, int width, int height) {
     // Create a new array to store the flipped bitmap
     unsigned char *flipped_bitmap = (unsigned char *)malloc(width * height);
@@ -126,7 +154,7 @@ void font_render_text(Font *font, const char *text, float x, float y, vec3 color
 		// Special handling for the space character
         if (*p == ' ') {
             // Reduce the spacing for the space character
-            x += font->size / 3.0f; // Adjust the multiplier to your preference (3.0f makes the space tighter)
+            x += font->size / space_divide_font_by; // Adjust the multiplier to your preference (3.0f makes the space tighter)
             continue; // Skip rendering this character
         }
 
