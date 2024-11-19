@@ -1,7 +1,7 @@
 #ifndef DEFAULT_H
 #define DEFAULT_H
 
-#include "scene.h"
+#include <scenes/scene.h>
 
 void default_scene_update(Scene* self);
 void default_scene_render(Scene* self);

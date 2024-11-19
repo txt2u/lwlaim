@@ -1,4 +1,4 @@
-#version 330 core
+#version 440 core
 
 layout(location = 0) in vec2 position;    // Vertex position (x, y)
 layout(location = 1) in vec2 texCoord;    // Texture coordinates (u, v)
