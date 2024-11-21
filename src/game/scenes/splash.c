@@ -48,7 +48,7 @@ void splash_scene_update(Scene* self) {
 	glfwGetFramebufferSize(self->window, &framebufferWidth, &framebufferHeight);
 	glViewport(0, 0, framebufferWidth, framebufferHeight);
 
-	glClearColor(0.2f, 0.0f, 0.0f, 1.0f);
+	glClearColor(0.1f, 0.0f, 0.0f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT);
 	glClear(GL_DEPTH_BUFFER_BIT);
 

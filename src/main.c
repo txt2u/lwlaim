@@ -17,6 +17,8 @@
 #include <scenes/default.h>
 #include <scenes/splash.h>
 
+#include <debugger.h>
+
 int main() {
     // Initialize glfw
     if(!glfwInit()) {
@@ -76,6 +78,9 @@ int main() {
     // Keyboard and mouse callback functions
     glfwSetKeyCallback(window, keyboard_callback);
     glfwSetCursorPosCallback(window, cursor_callback);
+
+	// ! > Debugger
+	enableOpenGLDebugging();
   
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_MULTISAMPLE);

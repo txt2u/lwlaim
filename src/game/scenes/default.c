@@ -2,23 +2,31 @@
 #include <GLFW/glfw3.h>
 
 #include <scenes/scene.h>
-#include <projections/camera.h>
-#include <input/mue.h>
-#include <input/kbd.h>
+
 #include <pipeline/shader.h>
 #include <pipeline/buffers.h>
+
+#include <projections/camera.h>
+#include <projections/ortho.h>
+
+#include <input/mue.h>
+#include <input/kbd.h>
+
 #include <ui/crosshair.h>
 #include <ui/text.h>
-#include <projections/ortho.h>
 #include <ui/image.h>
-#include "qreader.h"
+
+#include <qreader.h>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
 #include <cglm/cglm.h>
 
-#include <entites/model.h>
+#include <entities/drawable.h>
+#include <entities/mesh.h>
+#include <entities/model.h>
+#include <entities/ecs.h>
 
 static ShaderProgram shader;
 static ShaderProgram image_shader;
@@ -27,8 +35,6 @@ static Buffers buffers;
 
 static Crosshair crosshair;
 
-static Model model;
-static Model model_plane;
 static GLuint texture;
 static Camera camera;
     
@@ -50,7 +56,10 @@ static float fps = 0.0f;
 
 // Declare an image
 static Image background_image;
-	
+
+static Model model; // A struct to hold GLTF model data
+static Drawable drawable;
+
 void default_scene_update(Scene* self) {
 	// Get framebuffer size
 	int framebufferWidth, framebufferHeight;
@@ -86,12 +95,19 @@ void default_scene_update(Scene* self) {
 	// Set up the MVP matrices
 	camera_get_view_matrix(&camera, view);
 	camera_get_projection_matrix(&camera, projection, framebufferWidth, framebufferHeight);
+	
+	// Set projection matrix in shader
+	GLuint model_loc = glGetUniformLocation(shader.id, "model");
+	GLuint view_loc = glGetUniformLocation(shader.id, "view");
+	GLuint projection_loc = glGetUniformLocation(shader.id, "projection");
 
-	// Bind buffers and draw
-	shader_use(&shader);
-	render_model(&model, view, projection);
-	render_model(&model_plane, view, projection);
-	model_scale(&model_plane, (vec3){0.5f, 1.0f, 0.5f});
+	glUniformMatrix4fv(model_loc, 1, GL_FALSE, (const GLfloat*)drawable.model_matrix);
+	glUniformMatrix4fv(view_loc, 1, GL_FALSE, (const GLfloat*)view);
+	glUniformMatrix4fv(projection_loc, 1, GL_FALSE, (const GLfloat*)projection);
+
+	draw_manager_draw(&drawable);
+	draw_manager_translate(&drawable, (vec3){ 1.0f, 1.0f, 1.0f });
+	draw_manager_scale(&drawable, (vec3){ 1.0f, 1.0f, 1.0f });
 
 	// Use image shader program
 	shader_use(&image_shader);
@@ -197,33 +213,13 @@ void default_scene_render(Scene* self) {
     }
     printf("Image shader program created.\n");
 
-	// Load the model using model.h's load_model function
-    if (!load_model(
-		"resources/static/base_enemy.obj",
-		"resources/prototype/floor_pro_2.png", 
-		&model, shader.id
-	)) {
-		fprintf(stderr, "Failed to load OBJ file!\n");
-		return;
-	} else {
-		printf("Model loaded: %d vertices, %d texcoords, %d normals, %d indices.\n", 
-			model.vertex_count, model.texcoord_count, model.normal_count, model.index_count);
-	}
-
-	// Load the model using model.h's load_model function
-    if (!load_model(
-		"resources/static/plane.obj",
-		"resources/prototype/image.png", 
-		&model_plane, shader.id
-	)) {
-		fprintf(stderr, "Failed to load OBJ file!\n");
-		return;
-	} else {
-		printf("Model loaded: %d vertices, %d texcoords, %d normals, %d indices.\n", 
-			model_plane.vertex_count, model_plane.texcoord_count, model_plane.normal_count, model_plane.index_count);
-	}
-	model_scale(&model, (vec3){1.0f, 1.0f, 1.0f});
-	model_scale(&model_plane, (vec3){1.0f, 1.0f, 1.0f});
+	// ! LOAD A BASIC GLTF MODEL HERE
+    if (!model_load_gltf(&model, "resources/models/cube.gltf")) {
+        fprintf(stderr, "Failed to load GLTF model!\n");
+        return;
+    }
+    printf("GLTF model loaded successfully.\n");
+	draw_manager_init_from_mesh(&drawable, model.meshes[0]);
 
 	stbi_set_flip_vertically_on_load(1);
 

@@ -11,11 +11,13 @@ GLuint buffers_create_vao() {
 // Creates and returns a VBO with the specified vertex data
 GLuint buffers_create_vbo(const float* vertices, size_t vertex_count) {
     GLuint VBO;
-    glGenBuffers(1, &VBO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, vertex_count * sizeof(float), vertices, GL_STATIC_DRAW);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    return VBO;
+    glGenBuffers(1, &VBO);  // Generate a VBO
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);  // Bind the VBO to the GL_ARRAY_BUFFER target
+    
+    // Upload the vertex data to the GPU
+    glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * vertex_count, vertices, GL_STATIC_DRAW);
+
+    return VBO;  // Return the VBO ID
 }
 
 // Creates and returns an EBO with the specified index data
@@ -23,7 +25,7 @@ GLuint buffers_create_ebo(const unsigned int* indices, size_t index_count) {
     GLuint EBO;
     glGenBuffers(1, &EBO);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, index_count * sizeof(unsigned int), indices, GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, index_count * sizeof(GLuint), indices, GL_STATIC_DRAW);  // Use GLuint here
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     return EBO;
 }

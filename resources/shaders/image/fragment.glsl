@@ -1,4 +1,4 @@
-#version 440 core
+#version 330 core
 
 in vec2 fragTexCoord;            // Texture coordinates from vertex shader
 out vec4 FragColor;               // Output fragment color

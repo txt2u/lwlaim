@@ -1,4 +1,4 @@
-#include <entites/ecs.h>
+#include <entities/ecs.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>

@@ -1,188 +1,119 @@
 #include <loaders/obj.h>
-#include <string.h>
-#include <ctype.h>
-#include <stdlib.h>
+
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
-#define MAX_MTL_NAME_LENGTH 128
+#include <cglm/cglm.h>
 
-// Helper function to skip whitespace in a file
-static void skip_whitespace(FILE *file) {
-    char ch;
-    while ((ch = fgetc(file)) != EOF && isspace(ch));
-    if (ch != EOF) ungetc(ch, file);
-}
-
-// Function to extract the directory from a file path
-void extract_directory(const char *path, char *dir) {
-    const char *last_slash = strrchr(path, '/');
-    if (last_slash) {
-        size_t len = last_slash - path;
-        strncpy(dir, path, len);
-        dir[len] = '\0';
-    } else {
-        dir[0] = '\0';  // No directory part, return empty string
-    }
-}
-
-// Function to load the MTL file
-void load_mtl(const char *filename) {
+int load_obj(const char *filename, StaticMesh *mesh) {
     FILE *file = fopen(filename, "r");
     if (!file) {
-        fprintf(stderr, "Failed to open MTL file: %s\n", filename);
-        return;
+        fprintf(stderr, "Could not open file: %s\n", filename);
+        return -1;
     }
 
-    char line[256];
-    char current_material[MAX_MTL_NAME_LENGTH] = "";
+    size_t positions_size = 0;
+    size_t normals_size = 0;
+    size_t texcoords_size = 0;
+    size_t indices_size = 0;
+
+    char line[128];
+    while (fgets(line, sizeof(line), file)) {
+        if (strncmp(line, "v ", 2) == 0) {
+            positions_size++;
+        } else if (strncmp(line, "vn ", 3) == 0) {
+            normals_size++;
+        } else if (strncmp(line, "vt ", 3) == 0) {
+            texcoords_size++;
+        } else if (strncmp(line, "f ", 2) == 0) {
+            // We don't know the number of vertices per face, so count them dynamically
+            int vertex_count = 0;
+            char *token = strtok(line + 2, " ");
+            while (token != NULL) {
+                vertex_count++;
+                token = strtok(NULL, " ");
+            }
+            indices_size += vertex_count-1; // Triangulate the face
+        }
+    }
+
+    // Allocate memory for data
+    mesh->positions = malloc(sizeof(float) * 3 * positions_size); // 3 floats per vertex
+    mesh->normals = malloc(sizeof(float) * 3 * normals_size);     // 3 floats per normal
+    mesh->texcoords = malloc(sizeof(float) * 2 * texcoords_size); // 2 floats per texture coordinate
+    mesh->indices = malloc(sizeof(unsigned int) * indices_size);  // Indices for faces
+
+    mesh->vertex_count = positions_size;
+    mesh->index_count = indices_size;
+    mesh->texcoords_count = texcoords_size;
+    mesh->normals_count = normals_size;
+
+    // Reset file pointer and parse the data
+    rewind(file);
+
+    size_t position_index = 0;
+    size_t normal_index = 0;
+    size_t texcoord_index = 0;
+    size_t index_index = 0;
 
     while (fgets(line, sizeof(line), file)) {
-        skip_whitespace(file);
-
-        // New material definition (newmtl)
-        if (strncmp(line, "newmtl ", 7) == 0) {
-            sscanf(line + 7, "%s", current_material);
-            printf("Found material: %s\n", current_material);
-        }
-        // Material properties (ambient, diffuse, etc.)
-        else if (strncmp(line, "Ka ", 3) == 0) {
-            // Ambient color
-            float r, g, b;
-            sscanf(line + 3, "%f %f %f", &r, &g, &b);
-            printf("Ambient color for %s: (%f, %f, %f)\n", current_material, r, g, b);
-        }
-        else if (strncmp(line, "Kd ", 3) == 0) {
-            // Diffuse color
-            float r, g, b;
-            sscanf(line + 3, "%f %f %f", &r, &g, &b);
-            printf("Diffuse color for %s: (%f, %f, %f)\n", current_material, r, g, b);
-        }
-        else if (strncmp(line, "Ks ", 3) == 0) {
-            // Specular color
-            float r, g, b;
-            sscanf(line + 3, "%f %f %f", &r, &g, &b);
-            printf("Specular color for %s: (%f, %f, %f)\n", current_material, r, g, b);
-        }
-        // Texture files (for now, we print them)
-        else if (strncmp(line, "map_Kd ", 7) == 0) {
-            char texture_filename[256];
-            sscanf(line + 7, "%s", texture_filename);
-            printf("Diffuse texture for %s: %s\n", current_material, texture_filename);
-        }
-    }
-
-    fclose(file);
-}
-
-// Function to load the OBJ file
-int load_obj(const char *filename, StaticModel *model) {
-    FILE *file = fopen(filename, "r");
-    if (!file) {
-        fprintf(stderr, "Failed to open file: %s\n", filename);
-        return 0;
-    }
-
-    // Initialize model data
-    model->vertices = NULL;
-    model->normals = NULL;
-    model->texcoords = NULL;
-    model->indices = NULL;
-    model->vertex_count = 0;
-    model->normal_count = 0;
-    model->texcoord_count = 0;
-    model->index_count = 0;
-
-    char line[256];
-    char mtl_filename[256] = "";
-    char dir[256] = "";
-
-    while (fgets(line, sizeof(line), file)) {
-        skip_whitespace(file);
-
-        // Check for material file (mtllib)
-        if (strncmp(line, "mtllib ", 7) == 0) {
-            sscanf(line + 7, "%s", mtl_filename);
-            extract_directory(filename, dir);
-            strcat(dir, "/");
-            strcat(dir, mtl_filename);
-            printf("Found MTL file: %s\n", dir);
-            load_mtl(dir);  // Load the material file
-        }
-
-        // Vertex position
-        else if (strncmp(line, "v ", 2) == 0) {
-            model->vertex_count++;
-            model->vertices = realloc(model->vertices, model->vertex_count * 3 * sizeof(float));
-            if (!model->vertices) {
-                fclose(file);
-                return 0;  // Memory allocation failure
-            }
-            sscanf(line + 2, "%f %f %f", 
-                    &model->vertices[(model->vertex_count - 1) * 3], 
-                    &model->vertices[(model->vertex_count - 1) * 3 + 1], 
-                    &model->vertices[(model->vertex_count - 1) * 3 + 2]);
-        }
-        // Normal vector
-        else if (strncmp(line, "vn ", 3) == 0) {
-            model->normal_count++;
-            model->normals = realloc(model->normals, model->normal_count * 3 * sizeof(float));
-            if (!model->normals) {
-                fclose(file);
-                return 0;  // Memory allocation failure
-            }
-            sscanf(line + 3, "%f %f %f", 
-                    &model->normals[(model->normal_count - 1) * 3],
-                    &model->normals[(model->normal_count - 1) * 3 + 1], 
-                    &model->normals[(model->normal_count - 1) * 3 + 2]);
-        }
-        // Texture coordinates
-        else if (strncmp(line, "vt ", 3) == 0) {
-            model->texcoord_count++;
-            model->texcoords = realloc(model->texcoords, model->texcoord_count * 2 * sizeof(float));
-            if (!model->texcoords) {
-                fclose(file);
-                return 0;  // Memory allocation failure
-            }
-            sscanf(line + 3, "%f %f", 
-                    &model->texcoords[(model->texcoord_count - 1) * 2],
-                    &model->texcoords[(model->texcoord_count - 1) * 2 + 1]);
-        }
-        // Face data (indices)
-        else if (strncmp(line, "f ", 2) == 0) {
-            model->index_count += 3; // Assuming triangle faces for simplicity
-            model->indices = realloc(model->indices, model->index_count * sizeof(unsigned int));
-            if (!model->indices) {
-                fclose(file);
-                return 0;  // Memory allocation failure
-            }
-
-            unsigned int v[3], t[3], n[3];
-            // Extract indices from face line (up to 3 vertices per face)
-            if (sscanf(line + 2, "%u/%u/%u %u/%u/%u %u/%u/%u", 
-                &v[0], &t[0], &n[0], &v[1], &t[1], &n[1], &v[2], &t[2], &n[2]) == 9) {
-                for (int i = 0; i < 3; i++) {
-                    model->indices[(model->index_count - 3) + i] = v[i] - 1; // OBJ indices are 1-based
+        if (strncmp(line, "v ", 2) == 0) {
+            // Parse position
+            float x, y, z;
+            sscanf(line, "v %f %f %f", &x, &y, &z);
+            mesh->positions[position_index * 3] = x;
+            mesh->positions[position_index * 3 + 1] = y;
+            mesh->positions[position_index * 3 + 2] = z;
+            position_index++;
+        } else if (strncmp(line, "vn ", 3) == 0) {
+            // Parse normal
+            float nx, ny, nz;
+            sscanf(line, "vn %f %f %f", &nx, &ny, &nz);
+            mesh->normals[normal_index * 3] = nx;
+            mesh->normals[normal_index * 3 + 1] = ny;
+            mesh->normals[normal_index * 3 + 2] = nz;
+            normal_index++;
+        } else if (strncmp(line, "vt ", 3) == 0) {
+            // Parse texture coordinate
+            float u, v;
+            sscanf(line, "vt %f %f", &u, &v);
+            mesh->texcoords[texcoord_index * 2] = u;
+            mesh->texcoords[texcoord_index * 2 + 1] = v;
+            texcoord_index++;
+        } else if (strncmp(line, "f ", 2) == 0) {
+            // Parse face (indices)
+            unsigned int p_idx[10], t_idx[10], n_idx[10];  // Max 10 vertices per face
+            int vertex_count = 0;
+            char *token = strtok(line + 2, " ");
+            while (token != NULL) {
+                int matched = sscanf(token, "%u/%u/%u", &p_idx[vertex_count], &t_idx[vertex_count], &n_idx[vertex_count]);
+                if (matched == 3) {
+                    vertex_count++;
                 }
+                token = strtok(NULL, " ");
+            }
+
+            // Triangulate the face (if necessary)
+            for (int i = 1; i < vertex_count - 1; i++) {
+                // Indices
+                // mesh->indices[index_index++] = p_idx[0] - 1; // 1-based to 0-based index
+                // mesh->indices[index_index++] = p_idx[i] - 1;
+                // mesh->indices[index_index++] = p_idx[i + 1] - 1;
+
+                // // Texture coordinates
+                // mesh->texcoords[index_index - 3] = mesh->texcoords[(t_idx[0] - 1) * 2];
+                // mesh->texcoords[index_index - 2] = mesh->texcoords[(t_idx[i] - 1) * 2];
+                // mesh->texcoords[index_index - 1] = mesh->texcoords[(t_idx[i + 1] - 1) * 2];
+
+                // // Normals
+                // mesh->normals[index_index - 3] = mesh->normals[(n_idx[0] - 1) * 3];
+                // mesh->normals[index_index - 2] = mesh->normals[(n_idx[i] - 1) * 3];
+                // mesh->normals[index_index - 1] = mesh->normals[(n_idx[i + 1] - 1) * 3];
             }
         }
     }
 
     fclose(file);
     return 1;
-}
-
-// Free model data
-void free_static_model(StaticModel *model) {
-    free(model->vertices);
-    free(model->normals);
-    free(model->texcoords);
-    free(model->indices);
-    model->vertices = NULL;
-    model->normals = NULL;
-    model->texcoords = NULL;
-    model->indices = NULL;
-    model->vertex_count = 0;
-    model->normal_count = 0;
-    model->texcoord_count = 0;
-    model->index_count = 0;
 }
