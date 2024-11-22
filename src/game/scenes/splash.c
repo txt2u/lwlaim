@@ -48,7 +48,7 @@ void splash_scene_update(Scene* self) {
 	glfwGetFramebufferSize(self->window, &framebufferWidth, &framebufferHeight);
 	glViewport(0, 0, framebufferWidth, framebufferHeight);
 
-	glClearColor(0.1f, 0.0f, 0.0f, 1.0f);
+	glClearColor(0.02f, 0.0f, 0.0f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT);
 	glClear(GL_DEPTH_BUFFER_BIT);
 
@@ -93,7 +93,6 @@ void splash_scene_update(Scene* self) {
 	font_render_text(&font, loading_text, text_x, text_y + font_size, color); // Centered text
 	font_render_text(&font, notify_text, text_xm, text_y + (font_size * 2.0f) + 2.0f, color); // Centered text
 
-	buffers_unbind_vao();
 	buffers_unbind_vbo();
 	buffers_unbind_ebo();
 
@@ -101,7 +100,7 @@ void splash_scene_update(Scene* self) {
     double current_time = glfwGetTime();
 
     // If 8 seconds have passed, update the state to "loaded"
-    if (current_time - start_time >= 1.0) {
+    if (current_time - start_time >= 2.0) {
         scene_state_set(&self->state, "loaded", "1"); // Set the loaded state
     }
 }

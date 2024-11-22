@@ -1,4 +1,4 @@
-#version 330 core
+#version 410 core
 
 in vec3 fragNormal;  // Normal passed from vertex shader
 in vec2 fragTexCoord;  // Texture coordinates passed from vertex shader

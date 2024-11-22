@@ -1,9 +1,9 @@
 {
 	"scripts": {
-		"buildcd": "clang -pipe -o dest/lwlaim.exe $(find src -name '*.c') -I\"include\" -L\"linkers\" -lglfw3dll -lopengl32 ",
-		"buildcdm": "clang -pipe -o dest/lwlaim.exe $(find src -name '*.c') -I\"include\" -L\"linkers\" -lglfw3dll -lopengl32 -mwindows",
-		"buildcw": "clang -O3 -flto -ffunction-sections -fdata-sections -pipe -march=native -mtune=native -o dest/lwlaim.exe $(find src -name '*.c') -I\"include\" -L\"linkers\" -lglfw3dll -lopengl32 -Wl,--gc-sections -s -Wl,--strip-all -mwindows && upx -9 --lzma --best dest/lwlaim.exe",
-		"buildc": "clang -O3 -flto -ffunction-sections -fdata-sections -pipe -march=native -mtune=native -o dest/lwlaim.exe $(find src -name '*.c') -I\"include\" -L\"linkers\" -lglfw3 -lopengl -lglad -Wl,--gc-sections -s -Wl,--strip-all && upx -9 --lzma --best dest/lwlaim.exe",
+		"buildcd": "clang -pipe -o dest/lwlaim.exe $(find src -name '*.c') -I\"include\" -L\"linkers\" -lglfw3dll -lopengl32 -lopenal32 -lopenal32.dll",
+		"buildcdm": "clang -pipe -o dest/lwlaim.exe $(find src -name '*.c') -I\"include\" -L\"linkers\" -lglfw3dll -lopengl32 -lopenal32 -lopenal32.dll -mwindows",
+		"buildcw": "clang -O3 -flto -ffunction-sections -fdata-sections -pipe -march=native -mtune=native -o dest/lwlaim.exe $(find src -name '*.c') -I\"include\" -L\"linkers\" -lglfw3dll -lopengl32 -lopenal32 -lopenal32.dll -Wl,--gc-sections -s -Wl,--strip-all -mwindows && upx -9 --lzma --best dest/lwlaim.exe",
+		"buildc": "clang -O3 -flto -ffunction-sections -fdata-sections -pipe -march=native -mtune=native -o dest/lwlaim.exe $(find src -name '*.c') -I\"include\" -L\"linkers\" -lglfw3 -lopengl -lopenal32 -lglad -Wl,--gc-sections -s -Wl,--strip-all && upx -9 --lzma --best dest/lwlaim.exe",
 		"cr": "[ -d dest/resources ] && rm -r dest/resources; cp -R resources dest/resources",
 		"crw": "[ ! -d dest ] && mkdir -p dest; find windll -type f -exec bash -c 'if [ ! -e \"dest/$(basename \"{}\")\" ]; then cp \"{}\" dest/; fi' \\;",
 		"dev": "./dest/lwlaim.exe",
