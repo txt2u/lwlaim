@@ -1,4 +1,4 @@
-#include <entities/model.h>
+#include <entities/mesh.h>
 #include <stdlib.h>
 #include <string.h>
 

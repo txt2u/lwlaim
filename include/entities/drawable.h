@@ -8,9 +8,14 @@
 #include <entities/model.h>
 
 typedef struct {
-    mat4 model_matrix;
     Buffers buffers;
 	Mesh *mesh;
+
+    mat4 model_matrix;
+	
+	vec3 translation;
+	vec3 scale;
+	vec3 rotation;
 } Drawable;
 
 // Initializes a drawable object from a mesh
@@ -26,7 +31,7 @@ void draw_manager_translate(Drawable* drawable, vec3 translation);
 void draw_manager_scale(Drawable* drawable, vec3 scale);
 
 // Applies rotation to the drawable object
-void draw_manager_rotate(Drawable* drawable, float angle, vec3 axis);
+void draw_manager_rotate(Drawable* drawable, vec3 angle);
 
 // Cleans up drawable buffers
 void draw_manager_destroy(Drawable* drawable);

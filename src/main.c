@@ -49,8 +49,11 @@ int main() {
     }
 
     // Access screen width and height
-    int screen_w = video_mode->width;
-    int screen_h = video_mode->height;
+    // int screen_w = video_mode->width;
+    // int screen_h = video_mode->height;
+
+    int screen_w = 1024;
+    int screen_h = 600;
 
     // Create a fullscreen-borderless window
     GLFWwindow* window = glfwCreateWindow(screen_w, screen_h, "lwlaim", NULL, NULL);

@@ -15,6 +15,7 @@
 #include <ui/crosshair.h>
 #include <ui/text.h>
 #include <ui/image.h>
+#include <ui/widgets/button.h>
 
 #include <qreader.h>
 
@@ -31,6 +32,7 @@
 static ShaderProgram shader;
 static ShaderProgram image_shader;
 static ShaderProgram text_shader;
+static ShaderProgram button_shader;
 static Buffers buffers;
 
 static Crosshair crosshair;
@@ -39,7 +41,7 @@ static GLuint texture;
 static Camera camera;
     
 static float deltaTime = 0.0f, lastFrame = 0.0f;
-static mat4 view, projection, text_projection, image_projection;
+static mat4 view, projection, text_projection, image_projection, button_projection;
 
 static vec4 crosshairColor = {1.0f, 1.0f, 1.0f, 0.2f}; // White color
 static float crosshairSize = 4.0f; // Adjust crosshair size as needed
@@ -59,6 +61,8 @@ static Image background_image;
 
 static Model model; // A struct to hold GLTF model data
 static Drawable drawable;
+
+Button my_button;
 
 void default_scene_update(Scene* self) {
 	// Get framebuffer size
@@ -105,6 +109,14 @@ void default_scene_update(Scene* self) {
 	glUniformMatrix4fv(view_loc, 1, GL_FALSE, (const GLfloat*)view);
 	glUniformMatrix4fv(projection_loc, 1, GL_FALSE, (const GLfloat*)projection);
 
+	// Bind texture
+	glActiveTexture(GL_TEXTURE0); // Activate texture unit 0
+	glBindTexture(GL_TEXTURE_2D, model.texture_id);
+
+	// Pass the texture to the shader
+	GLuint texture_loc = glGetUniformLocation(shader.id, "texture1");
+	glUniform1i(texture_loc, 0);  // Set it to texture unit 0
+
 	draw_manager_draw(&drawable);
 	draw_manager_translate(&drawable, (vec3){ 1.0f, 1.0f, 1.0f });
 	draw_manager_scale(&drawable, (vec3){ 1.0f, 1.0f, 1.0f });
@@ -120,9 +132,33 @@ void default_scene_update(Scene* self) {
 	glUniformMatrix4fv(img_proj_loc, 1, GL_FALSE, (const GLfloat*)image_projection);
 
 	// Render 2D Image (background)
-	image_set_dimensions_by_shader(&background_image, 260.0f, 260.0f);
+	image_set_dimensions_by_shader(&background_image, 64.0f, 64.0f);
 	// image_set_rotation_by_shader(&background_image, glfwGetTime() * 150.0f);
 	image_render(&background_image, 4.0f, 140.0f); // Render the loaded background image
+
+	// Use Button shader program
+	shader_use(&button_shader);
+
+	// Ortho projection setup for image
+	setup_ortho_projection(framebufferWidth, framebufferHeight, button_projection);
+
+	// Set projection matrix in shader
+	GLuint btn_proj_loc = glGetUniformLocation(my_button.shader_program, "projection");
+	glUniformMatrix4fv(btn_proj_loc, 1, GL_FALSE, (const GLfloat*)button_projection);
+
+    button_render(&my_button, 0.0f, 240.0f, framebufferWidth, framebufferHeight);
+
+	bool hover = button_check_hover(&my_button, cursor_x_position, cursor_y_position);
+	// bool click = button_check_click(&my_button, cursor_x_position, cursor_y_position, glfwGetMouseButton(self->window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS);
+
+	if (hover) {
+		button_scale(&my_button, 1.1f, 1.1f);
+		button_change_color(&my_button, (vec4){0.0f, 0.0f, 0.7f, 1.0f});
+	} else {
+		button_scale(&my_button, 1.0f, 1.0f);
+		button_change_color(&my_button, (vec4){0.0f, 0.0f, 0.7f, 0.5f});
+	}
+
 	// Use text shader program
 	shader_use(&text_shader);
 
@@ -198,7 +234,7 @@ void default_scene_render(Scene* self) {
 	// Compile shaders and create shader program
     char* i_vertexShaderSource = read_file("resources/shaders/image/vertex.glsl");
     char* i_fragmentShaderSource = read_file("resources/shaders/image/fragment.glsl");
-    if (!t_vertexShaderSource || !t_fragmentShaderSource) {
+    if (!i_vertexShaderSource || !i_fragmentShaderSource) {
         fprintf(stderr, "Failed to load image shader sources!\n");
         return;
     }
@@ -213,13 +249,33 @@ void default_scene_render(Scene* self) {
     }
     printf("Image shader program created.\n");
 
+	// Initialize image renderer
+	// Compile shaders and create shader program
+    char* b_vertexShaderSource = read_file("resources/shaders/button/vertex.glsl");
+    char* b_fragmentShaderSource = read_file("resources/shaders/button/fragment.glsl");
+    if (!b_vertexShaderSource || !b_fragmentShaderSource) {
+        fprintf(stderr, "Failed to load image shader sources!\n");
+        return;
+    }
+
+	button_shader = shader_create(b_vertexShaderSource, b_fragmentShaderSource);
+    free(b_vertexShaderSource);
+    free(b_fragmentShaderSource);
+
+    if (button_shader.id == 0) {
+        fprintf(stderr, "Shader program creation failed!\n");
+        return;
+    }
+    printf("Button shader program created.\n");
+
 	// ! LOAD A BASIC GLTF MODEL HERE
-    if (!model_load_gltf(&model, "resources/models/cube.gltf")) {
+    if (!model_load_gltf(&model, "resources/prototype/floor_pro_1.png", "resources/models/cube.gltf")) {
         fprintf(stderr, "Failed to load GLTF model!\n");
         return;
     }
     printf("GLTF model loaded successfully.\n");
 	draw_manager_init_from_mesh(&drawable, model.meshes[0]);
+	draw_manager_scale(&drawable, (vec3){1.0f, 1.0f, 1.0f});
 
 	stbi_set_flip_vertically_on_load(1);
 
@@ -235,6 +291,14 @@ void default_scene_render(Scene* self) {
 	image_init(&background_image, "resources/prototype/image.png", image_shader.id);
 	image_set_dimensions(&background_image, 1024, 1024);
 	printf("Initialized background_image\n");
+
+	button_init(
+		&my_button, "Hover me", 
+		100.0f, 100.0f, 200.0f, 60.0f, 
+		button_shader.id, BUTTON_TYPE_COLOR, 0, 
+		(vec4){0.2f, 0.0f, 0.0f, 1.0f}, 
+		&font, (vec3){1.0f, 1.0f, 1.0f}
+	);
 }
 
 void default_scene_cleanup() {

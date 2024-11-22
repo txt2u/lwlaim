@@ -11,6 +11,17 @@ void camera_init(Camera* camera, vec3 position, vec3 up, float yaw, float pitch)
     camera->movementSpeed = 2.5f;
     camera->mouseSensitivity = 0.1f;
     camera->fov = 80.0f;
+
+	camera->near = 0.01f;
+	camera->far = 800.0f;
+}
+
+void set_camera_near(Camera* camera, float near) {
+	camera->near = near;
+}
+
+void set_camera_far(Camera* camera, float far) {
+	camera->far = far;
 }
 
 void camera_update(Camera* camera) {
@@ -42,6 +53,16 @@ void camera_process_keyboard(Camera* camera, GLFWwindow* window, float deltaTime
         vec3 movement;
         glm_vec3_scale(camera->right, velocity, movement); // Scale the right vector by velocity
         glm_vec3_add(camera->position, movement, camera->position); // Add to camera position
+    }
+    if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS) {
+        vec3 movement;
+        glm_vec3_scale(camera->up, velocity, movement); // Scale the up vector by velocity
+        glm_vec3_add(camera->position, movement, camera->position); // Add to camera position
+    }
+    if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) {
+        vec3 movement;
+        glm_vec3_scale(camera->up, velocity, movement); // Scale the up vector by velocity
+        glm_vec3_sub(camera->position, movement, camera->position); // Subtract from camera position
     }
 }
 
@@ -85,5 +106,5 @@ void camera_get_view_matrix(Camera* camera, mat4 view) {
 }
 
 void camera_get_projection_matrix(Camera* camera, mat4 projection, int width, int height) {
-    glm_perspective(glm_rad(camera->fov), (float)width / (float)height, 0.1f, 1000.0f, projection);
+    glm_perspective(glm_rad(camera->fov), (float)width / (float)height, camera->near, camera->far, projection);
 }
