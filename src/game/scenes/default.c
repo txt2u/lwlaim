@@ -29,6 +29,9 @@
 #include <entities/model.h>
 #include <entities/ecs.h>
 
+#include <output/sound.h>
+#include <wav.h>
+
 static ShaderProgram shader;
 static ShaderProgram image_shader;
 static ShaderProgram text_shader;
@@ -62,7 +65,8 @@ static Image background_image;
 static Model model; // A struct to hold GLTF model data
 static Drawable drawable;
 
-Button my_button;
+static Sound sound;
+static Button my_button;
 
 void default_scene_update(Scene* self) {
 	// Get framebuffer size
@@ -299,12 +303,35 @@ void default_scene_render(Scene* self) {
 		(vec4){0.2f, 0.0f, 0.0f, 1.0f}, 
 		&font, (vec3){1.0f, 1.0f, 1.0f}
 	);
+
+	sound_initialize();
+	alGenBuffers(1, &sound.buffer);
+	alGenSources(1, &sound.source);
+
+	ALsizei size, freq;
+	ALenum format;
+	ALvoid* data;
+	load_wav("resources/audio/stress.wav", &format, &data, &size, &freq); // Implement your loader
+	alBufferData(sound.buffer, format, data, size, freq);
+	free(data);
+
+	// Attach the buffer to the source
+	alSourcei(sound.source, AL_BUFFER, sound.buffer);
+
+	// Initialize sound properties
+	sound_set_volume(&sound, 0.1f);
+
+	// Play the sound
+	sound_play_once(&sound);
 }
 
 void default_scene_cleanup() {
 	// Clean up resources
 	image_cleanup(&background_image);
 	font_cleanup(&font);
+	model_free(&model);
+	draw_manager_destroy(&drawable);
+	sound_cleanup();
 	crosshair_destroy(&crosshair);
     shader_destroy(&shader);
     buffers_destroy(&buffers);

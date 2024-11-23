@@ -8,19 +8,29 @@ static ALCdevice* device = NULL;
 static ALCcontext* context = NULL;
 
 bool sound_initialize() {
-    device = alcOpenDevice(NULL); // Open the default device
+    // Retrieve the default device specifier
+    const ALchar* deviceName = alcGetString(NULL, ALC_DEFAULT_DEVICE_SPECIFIER);
+    if (!deviceName) {
+        fprintf(stderr, "Failed to retrieve default device specifier.\n");
+        return false;
+    }
+
+    // Open the audio device
+    device = alcOpenDevice(deviceName);
     if (!device) {
         fprintf(stderr, "Failed to open audio device.\n");
         return false;
     }
 
-    context = alcCreateContext(device, NULL); // Create an audio context
+    // Create the audio context
+    context = alcCreateContext(device, NULL);
     if (!context || !alcMakeContextCurrent(context)) {
         fprintf(stderr, "Failed to create or set audio context.\n");
         alcCloseDevice(device);
         return false;
     }
 
+    fprintf(stdout, "OpenAL initialized successfully. Device: %s\n", deviceName);
     return true;
 }
 
