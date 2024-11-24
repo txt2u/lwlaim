@@ -125,11 +125,13 @@ void default_scene_update(Scene* self) {
 	// For each mesh in the model, apply the mesh's local transformation
 	for (int i = 0; i < model.mesh_count; i++) {
 		// Combine the mesh's local transformation with the model's global transformation
-		mat4 combined_transform;
-		glm_mat4_mul(model.transform_matrix, model.meshes[i]->transform_matrix, combined_transform);
+		// ! vvvv enable if apply transform to parent is set to "true" vvvv
+		// mat4 combined_transform;
+		// glm_mat4_mul(model.transform_matrix, model.meshes[i]->transform_matrix, combined_transform);
+		// ! ^^^^ enable if apply transform to parent is set to "true" ^^^^
 
 		// Pass the combined transformation matrix to the shader
-		glUniformMatrix4fv(model_loc, 1, GL_FALSE, (const GLfloat*)combined_transform);  // Use combined_transform here
+		glUniformMatrix4fv(model_loc, 1, GL_FALSE, (const GLfloat*)model.transform_matrix);  // Use combined_transform here
 
 		// Draw the mesh with the combined transformation
 		draw_manager_draw(&drawable, model.meshes[i]->name);
@@ -294,8 +296,9 @@ void default_scene_render(Scene* self) {
     }
     printf("Loaded gltf model!\n");
 
+	model_set_position(&model, GLM_VEC3_ZERO);
 	model_set_scale(&model, (vec3){ 4.0f, 4.0f, 4.0f });
-	model_set_rotation(&model, (vec4){ 180.0f, 0.0f, 0.0f, 1.0f });
+	model_set_rotation(&model, (vec4){ 0.0f, 0.0f, 0.0f, 1.0f });
 	model_apply_transform(&model);
 
 	// Initialize the meshes as drawables

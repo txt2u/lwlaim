@@ -11,7 +11,7 @@
 #include <cglm/struct.h>
 
 // Function to load mesh from GLTF
-static Mesh *load_mesh_from_gltf(cgltf_mesh *gltf_mesh, const cgltf_data *gltf_data, cgltf_node *node, bool apply_parent_transform) {
+static Mesh *load_mesh_from_gltf(cgltf_mesh *gltf_mesh, const cgltf_data *gltf_data, cgltf_node *node, bool apply_parent_transform, Model *model) {
     Mesh *mesh = mesh_create(gltf_mesh->name ? gltf_mesh->name : "unknown_or_singular_mesh_type");
 
     // Assume single primitive for simplicity
@@ -76,7 +76,7 @@ static Mesh *load_mesh_from_gltf(cgltf_mesh *gltf_mesh, const cgltf_data *gltf_d
     }
 
     // Set position, scale, and rotation from the node
-    if (node) {
+    if (node && apply_parent_transform) {
         if (node->has_translation) {
             mesh->position[0] = node->translation[0];
             mesh->position[1] = -node->translation[2];
@@ -93,10 +93,19 @@ static Mesh *load_mesh_from_gltf(cgltf_mesh *gltf_mesh, const cgltf_data *gltf_d
             mesh->rotation[2] = node->rotation[3];
             mesh->rotation[3] = node->rotation[0];
         }
-    } else {
-        glm_vec3_zero(mesh->position);
-        glm_vec3_one(mesh->scale);
-        glm_quat_identity(mesh->rotation);
+    } else if (node && !apply_parent_transform) {
+		mesh->position[0] = model->position[0];
+		mesh->position[1] = model->position[1];
+		mesh->position[2] = model->position[2];
+
+		mesh->rotation[0] = model->rotation[1];
+		mesh->rotation[1] = model->rotation[2];
+		mesh->rotation[2] = model->rotation[3];
+		mesh->rotation[3] = model->rotation[0];
+        
+		mesh->scale[0] = model->scale[0];
+		mesh->scale[1] = model->scale[2];
+		mesh->scale[2] = model->scale[1];
     }
 
     // Apply parent transformation if requested
@@ -111,7 +120,11 @@ static Mesh *load_mesh_from_gltf(cgltf_mesh *gltf_mesh, const cgltf_data *gltf_d
         if (parent_node->has_rotation) {
             glm_quat_mul(mesh->rotation, parent_node->rotation, mesh->rotation);
         }
-    }
+    } else if (!apply_parent_transform) {
+		glm_vec3_copy(model->position, mesh->position);
+		glm_vec3_copy(model->scale, mesh->scale);
+		glm_quat_copy(model->rotation, mesh->rotation);
+	}
 
     // Update transformation matrix
     mesh_update_transform_matrix(mesh);
@@ -193,7 +206,7 @@ int model_load_gltf(Model *model, const char *texture_path, const char *file_pat
 
     for (size_t i = 0; i < gltf_data->meshes_count; i++) {
         cgltf_mesh *gltf_mesh = &gltf_data->meshes[i];
-        model->meshes[i] = load_mesh_from_gltf(gltf_mesh, gltf_data, &gltf_data->nodes[i], apply_parent_transform);
+        model->meshes[i] = load_mesh_from_gltf(gltf_mesh, gltf_data, &gltf_data->nodes[i], apply_parent_transform, model);
         if (!model->meshes[i]) {
             printf("Failed to load mesh %zu.\n", i);
             for (size_t j = 0; j < i; j++) {
