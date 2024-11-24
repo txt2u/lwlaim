@@ -17,6 +17,7 @@ typedef struct {
 // Sound system initialization and cleanup
 bool sound_initialize();
 void sound_cleanup();
+void sound_attach_buffer(Sound* sound);
 
 // Play sound functions
 void sound_play_once(Sound* sound);

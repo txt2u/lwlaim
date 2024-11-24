@@ -9,4 +9,5 @@ uniform sampler2D texture1;
 void main() {
     fragColor = texture(texture1, fragTexCoord);  // Simply output the color passed from the vertex shader
 	// fragColor = vec4(fragTexCoord, 0.0, 1.0);  // Show UVs as color
+	// fragColor = vec4(1.0);  // Show UVs as color
 }

@@ -109,11 +109,12 @@ void default_scene_update(Scene* self) {
 	GLuint view_loc = glGetUniformLocation(shader.id, "view");
 	GLuint projection_loc = glGetUniformLocation(shader.id, "projection");
 
-	glUniformMatrix4fv(model_loc, 1, GL_FALSE, (const GLfloat*)drawable.model_matrix);
+	// Pass the model matrix, view matrix, and projection matrix to the shader
+	glUniformMatrix4fv(model_loc, 1, GL_FALSE, (const GLfloat*)model.transform_matrix); // Global model matrix
 	glUniformMatrix4fv(view_loc, 1, GL_FALSE, (const GLfloat*)view);
 	glUniformMatrix4fv(projection_loc, 1, GL_FALSE, (const GLfloat*)projection);
 
-	// Bind texture
+	// Bind the texture
 	glActiveTexture(GL_TEXTURE0); // Activate texture unit 0
 	glBindTexture(GL_TEXTURE_2D, model.texture_id);
 
@@ -121,9 +122,18 @@ void default_scene_update(Scene* self) {
 	GLuint texture_loc = glGetUniformLocation(shader.id, "texture1");
 	glUniform1i(texture_loc, 0);  // Set it to texture unit 0
 
-	draw_manager_draw(&drawable);
-	draw_manager_translate(&drawable, (vec3){ 1.0f, 1.0f, 1.0f });
-	draw_manager_scale(&drawable, (vec3){ 1.0f, 1.0f, 1.0f });
+	// For each mesh in the model, apply the mesh's local transformation
+	for (int i = 0; i < model.mesh_count; i++) {
+		// Combine the mesh's local transformation with the model's global transformation
+		mat4 combined_transform;
+		glm_mat4_mul(model.transform_matrix, model.meshes[i]->transform_matrix, combined_transform);
+
+		// Pass the combined transformation matrix to the shader
+		glUniformMatrix4fv(model_loc, 1, GL_FALSE, (const GLfloat*)combined_transform);  // Use combined_transform here
+
+		// Draw the mesh with the combined transformation
+		draw_manager_draw(&drawable, model.meshes[i]->name);
+	}
 
 	// Use image shader program
 	shader_use(&image_shader);
@@ -272,14 +282,27 @@ void default_scene_render(Scene* self) {
     }
     printf("Button shader program created.\n");
 
-	// ! LOAD A BASIC GLTF MODEL HERE
-    if (!model_load_gltf(&model, "resources/prototype/floor_pro_1.png", "resources/models/cube.gltf")) {
+	// ! LOAD GLTF MODEL HERE
+    if (!model_load_gltf(
+		&model, 
+		"resources/static/psx_male_character.jpg", 
+		"resources/static/psx_male_character.gltf",
+		false)
+	) {
         fprintf(stderr, "Failed to load GLTF model!\n");
         return;
     }
-    printf("GLTF model loaded successfully.\n");
-	draw_manager_init_from_mesh(&drawable, model.meshes[0]);
-	draw_manager_scale(&drawable, (vec3){1.0f, 1.0f, 1.0f});
+    printf("Loaded gltf model!\n");
+
+	model_set_scale(&model, (vec3){ 4.0f, 4.0f, 4.0f });
+	model_set_rotation(&model, (vec4){ 180.0f, 0.0f, 0.0f, 1.0f });
+	model_apply_transform(&model);
+
+	// Initialize the meshes as drawables
+    for (int i = 0; i < model.mesh_count; i++) {
+        // Initialize drawable for each mesh
+        draw_manager_init_from_mesh(&drawable, model.meshes[i], model.meshes[i]->name);
+    }
 
 	stbi_set_flip_vertically_on_load(1);
 
@@ -316,10 +339,10 @@ void default_scene_render(Scene* self) {
 	free(data);
 
 	// Attach the buffer to the source
-	alSourcei(sound.source, AL_BUFFER, sound.buffer);
+	sound_attach_buffer(&sound);
 
 	// Initialize sound properties
-	sound_set_volume(&sound, 0.1f);
+	sound_set_volume(&sound, 0.0f);
 
 	// Play the sound
 	sound_play_once(&sound);

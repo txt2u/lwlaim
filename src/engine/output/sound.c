@@ -40,6 +40,10 @@ void sound_cleanup() {
     if (device) alcCloseDevice(device);
 }
 
+void sound_attach_buffer(Sound* sound) {
+	alSourcei(sound->source, AL_BUFFER, sound->buffer);
+}
+
 void sound_play_once(Sound* sound) {
     if (sound->is_muted) return;
     alSourcei(sound->source, AL_LOOPING, AL_FALSE); // Disable looping

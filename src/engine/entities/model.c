@@ -7,19 +7,23 @@
 #include <stdio.h>
 
 #include <stb_image.h>
+#include <cglm/cglm.h>
+#include <cglm/struct.h>
 
-static Mesh *load_mesh_from_gltf(cgltf_mesh *gltf_mesh, const cgltf_data *gltf_data) {
-    Mesh *mesh = mesh_create();
-    // Assume single primitive
+// Function to load mesh from GLTF
+static Mesh *load_mesh_from_gltf(cgltf_mesh *gltf_mesh, const cgltf_data *gltf_data, cgltf_node *node, bool apply_parent_transform) {
+    Mesh *mesh = mesh_create(gltf_mesh->name ? gltf_mesh->name : "unknown_or_singular_mesh_type");
+
+    // Assume single primitive for simplicity
     cgltf_primitive *primitive = &gltf_mesh->primitives[0];
 
-    // Load vertex data
+    // Load vertex data (positions, normals, texcoords)
     for (size_t i = 0; i < primitive->attributes_count; i++) {
         cgltf_attribute *attribute = &primitive->attributes[i];
         cgltf_accessor *accessor = attribute->data;
-        
+
         size_t num_components = cgltf_num_components(accessor->type);
-        
+
         if (attribute->type == cgltf_attribute_type_position) {
             mesh->vertex_count = accessor->count;
             mesh->vertices = malloc(sizeof(float) * num_components * accessor->count);
@@ -71,11 +75,94 @@ static Mesh *load_mesh_from_gltf(cgltf_mesh *gltf_mesh, const cgltf_data *gltf_d
         glm_vec3_maxv(vertex, mesh->max_bound, mesh->max_bound);
     }
 
+    // Set position, scale, and rotation from the node
+    if (node) {
+        if (node->has_translation) {
+            mesh->position[0] = node->translation[0];
+            mesh->position[1] = -node->translation[2];
+            mesh->position[2] = node->translation[1];
+        }
+        if (node->has_scale) {
+            mesh->scale[0] = node->scale[0];
+            mesh->scale[1] = node->scale[2];
+            mesh->scale[2] = node->scale[1];
+        }
+        if (node->has_rotation) {
+            mesh->rotation[0] = node->rotation[1];
+            mesh->rotation[1] = node->rotation[2];
+            mesh->rotation[2] = node->rotation[3];
+            mesh->rotation[3] = node->rotation[0];
+        }
+    } else {
+        glm_vec3_zero(mesh->position);
+        glm_vec3_one(mesh->scale);
+        glm_quat_identity(mesh->rotation);
+    }
+
+    // Apply parent transformation if requested
+    if (apply_parent_transform && node && node->parent) {
+        cgltf_node *parent_node = node->parent;
+        if (parent_node->has_translation) {
+            glm_vec3_mul(mesh->position, parent_node->translation, mesh->position);
+        }
+        if (parent_node->has_scale) {
+            glm_vec3_mul(mesh->scale, parent_node->scale, mesh->scale);
+        }
+        if (parent_node->has_rotation) {
+            glm_quat_mul(mesh->rotation, parent_node->rotation, mesh->rotation);
+        }
+    }
+
+    // Update transformation matrix
+    mesh_update_transform_matrix(mesh);
     return mesh;
 }
 
+// Model transformation functions
+void model_set_position(Model *model, vec3 new_position) {
+    glm_vec3_copy(new_position, model->position);  // Copy the new position into the model
+}
 
-int model_load_gltf(Model *model, const char *texture_path, const char *file_path) {
+void model_set_scale(Model *model, vec3 new_scale) {
+    glm_vec3_copy(new_scale, model->scale);  // Copy the new scale into the model
+}
+
+void model_set_rotation(Model *model, versor rotation) {
+    glm_quat_copy(rotation, model->rotation);  // Copy the quaternion into the model
+}
+
+// Rotation quat
+void create_rotation_quaternion(versor q, vec3 axis, float angle) {
+    glm_quatv(q, angle, axis);  // Create a quaternion from the axis and angle
+}
+
+void model_apply_transform(Model *model) {
+    // Ensure scale has safe default values
+    if (model->scale[0] == 0.0f && model->scale[1] == 0.0f && model->scale[2] == 0.0f) {
+        model->scale[0] = 1.0f;
+        model->scale[1] = 1.0f;
+        model->scale[2] = 1.0f;
+    }
+
+    // Start with the identity matrix
+    glm_mat4_identity(model->transform_matrix);
+
+    // Combine transformations in the correct order: scale -> rotate -> translate
+
+    // Apply scale
+    glm_scale(model->transform_matrix, model->scale);
+
+    // Apply rotation
+    glm_rotate(model->transform_matrix, glm_rad(model->rotation[0]), (vec3){1.0f, 0.0f, 0.0f});
+    glm_rotate(model->transform_matrix, glm_rad(model->rotation[1]), (vec3){0.0f, 1.0f, 0.0f});
+    glm_rotate(model->transform_matrix, glm_rad(model->rotation[2]), (vec3){0.0f, 0.0f, 1.0f});
+
+    // Apply translation
+    glm_translate(model->transform_matrix, model->position);
+}
+
+// GLTF loading function
+int model_load_gltf(Model *model, const char *texture_path, const char *file_path, bool apply_parent_transform) {
     if (!model || !file_path) {
         printf("Invalid parameters: model or file_path is NULL.\n");
         return -1;
@@ -96,7 +183,6 @@ int model_load_gltf(Model *model, const char *texture_path, const char *file_pat
         return -2;
     }
 
-    // Populate the model
     model->mesh_count = gltf_data->meshes_count;
     model->meshes = malloc(sizeof(Mesh *) * model->mesh_count);
     if (!model->meshes) {
@@ -106,10 +192,10 @@ int model_load_gltf(Model *model, const char *texture_path, const char *file_pat
     }
 
     for (size_t i = 0; i < gltf_data->meshes_count; i++) {
-        model->meshes[i] = load_mesh_from_gltf(&gltf_data->meshes[i], gltf_data);
+        cgltf_mesh *gltf_mesh = &gltf_data->meshes[i];
+        model->meshes[i] = load_mesh_from_gltf(gltf_mesh, gltf_data, &gltf_data->nodes[i], apply_parent_transform);
         if (!model->meshes[i]) {
             printf("Failed to load mesh %zu.\n", i);
-            // Clean up already-loaded meshes
             for (size_t j = 0; j < i; j++) {
                 mesh_free(model->meshes[j]);
             }
@@ -119,42 +205,44 @@ int model_load_gltf(Model *model, const char *texture_path, const char *file_pat
         }
     }
 
-	if (texture_path) {
-		int width, height, channels;
-		unsigned char* data = stbi_load(texture_path, &width, &height, &channels, 0);
+    if (texture_path) {
+        int width, height, channels;
+        unsigned char *data = stbi_load(texture_path, &width, &height, &channels, 0);
 
-		if (data) {
-			GLuint texture;
-			glGenTextures(1, &texture);
-			glBindTexture(GL_TEXTURE_2D, texture);
+        if (data) {
+            GLuint texture;
+            glGenTextures(1, &texture);
+            glBindTexture(GL_TEXTURE_2D, texture);
 
-			// Set texture parameters
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-			// Load texture data into OpenGL
-			GLenum format = (channels == 4) ? GL_RGBA : GL_RGB;
-			glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
-			glGenerateMipmap(GL_TEXTURE_2D);
+            GLenum format = (channels == 4) ? GL_RGBA : GL_RGB;
+            glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+            glGenerateMipmap(GL_TEXTURE_2D);
 
-			// Unbind texture and free image data
-			glBindTexture(GL_TEXTURE_2D, 0);
-			stbi_image_free(data);
+            glBindTexture(GL_TEXTURE_2D, 0);
+            stbi_image_free(data);
 
-			model->texture_id = texture;
+            model->texture_id = texture;
+            printf("Created texture with ID: %u\n", texture);
+        } else {
+            printf("Failed to load texture: %s\n", texture_path);
+        }
+    }
 
-			printf("Created texture with ID: %u\n", texture);
-		} else {
-			printf("Failed to load texture: %s\n", texture_path);
-		}
-	}
+    model_set_position(model, GLM_VEC3_ZERO);
+    model_set_scale(model, GLM_VEC3_ONE);
+    model_set_rotation(model, (vec4){1.0f, 0.0f, 0.0f, 0.0f});
+    model_apply_transform(model);
 
     cgltf_free(gltf_data);
-    return 1; // Success
+    return 1;
 }
 
+// Free model resources
 void model_free(Model *model) {
     if (model) {
         for (uint32_t i = 0; i < model->mesh_count; i++) {
