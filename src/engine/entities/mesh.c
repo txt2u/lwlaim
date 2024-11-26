@@ -2,6 +2,7 @@
 #include <cglm/cglm.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 // Constructor for creating a new mesh with a name
 Mesh *mesh_create(const char *name) {
@@ -29,7 +30,17 @@ Mesh *mesh_create(const char *name) {
 
     glm_mat4_identity(new_mesh->transform_matrix); // Default transform matrix
 
+    // Initialize the material pointer to NULL (set from outside when used)
+    new_mesh->material = NULL;
+
     return new_mesh;
+}
+
+// Function to set the material for the mesh
+void mesh_set_material(Mesh *mesh, Material *material) {
+    if (mesh) {
+        mesh->material = material;
+    }
 }
 
 // Function to update the mesh's transform matrix
@@ -62,6 +73,13 @@ void mesh_free(Mesh *mesh) {
         if (mesh->normals) free(mesh->normals);
         if (mesh->texcoords) free(mesh->texcoords);
         if (mesh->indices) free(mesh->indices);
+        
+        // Free material if it exists
+        if (mesh->material) {
+            material_free(mesh->material);  // Free the material resources
+            free(mesh->material);           // Free the material pointer if dynamically allocated
+        }
+        
         free(mesh);
     }
 }

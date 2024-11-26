@@ -114,10 +114,6 @@ void default_scene_update(Scene* self) {
 	glUniformMatrix4fv(view_loc, 1, GL_FALSE, (const GLfloat*)view);
 	glUniformMatrix4fv(projection_loc, 1, GL_FALSE, (const GLfloat*)projection);
 
-	// Bind the texture
-	glActiveTexture(GL_TEXTURE0); // Activate texture unit 0
-	glBindTexture(GL_TEXTURE_2D, model.texture_id);
-
 	// Pass the texture to the shader
 	GLuint texture_loc = glGetUniformLocation(shader.id, "texture1");
 	glUniform1i(texture_loc, 0);  // Set it to texture unit 0
@@ -126,12 +122,14 @@ void default_scene_update(Scene* self) {
 	for (int i = 0; i < model.mesh_count; i++) {
 		// Combine the mesh's local transformation with the model's global transformation
 		// ! vvvv enable if apply transform to parent is set to "true" vvvv
-		// mat4 combined_transform;
-		// glm_mat4_mul(model.transform_matrix, model.meshes[i]->transform_matrix, combined_transform);
+		mat4 combined_transform;
+		glm_mat4_mul(model.transform_matrix, model.meshes[i]->transform_matrix, combined_transform);
 		// ! ^^^^ enable if apply transform to parent is set to "true" ^^^^
 
 		// Pass the combined transformation matrix to the shader
-		glUniformMatrix4fv(model_loc, 1, GL_FALSE, (const GLfloat*)model.transform_matrix);  // Use combined_transform here
+		glUniformMatrix4fv(model_loc, 1, GL_FALSE, (const GLfloat*)combined_transform);  // Use combined_transform here
+		// ! ^^^^ change this to "combined_transform" if apply transform to parent is set to "true" ^^^^
+		material_apply(model.meshes[i]->material, shader.id);
 
 		// Draw the mesh with the combined transformation
 		draw_manager_draw(&drawable, model.meshes[i]->name);
@@ -287,17 +285,16 @@ void default_scene_render(Scene* self) {
 	// ! LOAD GLTF MODEL HERE
     if (!model_load_gltf(
 		&model, 
-		"resources/static/psx_male_character.jpg", 
-		"resources/static/psx_male_character.gltf",
-		false)
+		"resources/static/test.gltf",
+		true)
 	) {
         fprintf(stderr, "Failed to load GLTF model!\n");
         return;
     }
     printf("Loaded gltf model!\n");
 
-	model_set_position(&model, GLM_VEC3_ZERO);
-	model_set_scale(&model, (vec3){ 4.0f, 4.0f, 4.0f });
+	// model_set_position(&model, GLM_VEC3_ZERO);
+	// model_set_scale(&model, (vec3){ 4.0f, 4.0f, 4.0f });
 	model_set_rotation(&model, (vec4){ 0.0f, 0.0f, 0.0f, 1.0f });
 	model_apply_transform(&model);
 

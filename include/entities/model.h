@@ -2,6 +2,7 @@
 #define MODEL_H
 
 #include <entities/mesh.h>
+#include <entities/material.h>
 #include <stdint.h>
 #include <cglm/cglm.h>
 
@@ -9,7 +10,8 @@
 typedef struct {
     Mesh **meshes;            // Array of meshes
     uint32_t mesh_count;      // Number of meshes
-    int texture_id;           // Texture ID for the model
+    Material **materials;     // Array of materials for each mesh
+    uint32_t material_count;  // Number of materials
 
     vec3 position;            // Position of the model
     vec3 scale;               // Scale of the model
@@ -18,7 +20,7 @@ typedef struct {
 } Model;
 
 // Load a model from a glTF file and set the texture
-int model_load_gltf(Model *model, const char *texture_path, const char *file_path, bool apply_parent_transform);
+int model_load_gltf(Model *model, const char *file_path, bool apply_parent_transform);
 
 // Set the position of the model
 void model_set_position(Model *model, vec3 new_position);
@@ -34,6 +36,9 @@ void create_rotation_quaternion(versor q, vec3 axis, float angle);
 
 // Apply the current transformation matrix to the model (position + scale + rotation)
 void model_apply_transform(Model *model);
+
+// Apply material for each mesh (bind textures, set material properties)
+void model_apply_materials(Model *model, GLuint shader_program_id);
 
 // Free the model and all its meshes
 void model_free(Model *model);

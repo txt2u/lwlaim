@@ -10,8 +10,145 @@
 #include <cglm/cglm.h>
 #include <cglm/struct.h>
 
-// Function to load mesh from GLTF
-static Mesh *load_mesh_from_gltf(cgltf_mesh *gltf_mesh, const cgltf_data *gltf_data, cgltf_node *node, bool apply_parent_transform, Model *model) {
+// Function to load a texture from the GLTF data
+static Material *load_material_from_gltf(cgltf_material *gltf_material, const char* model_path) {
+	printf("[load_material_from_gltf] called.\n");
+    // Allocate memory for the Material struct
+    Material *material = malloc(sizeof(Material));
+    if (!material) {
+        printf("[GLTF_MODEL] Failed to allocate memory for material.\n");
+        return NULL;
+    }
+	printf("[load_material_from_gltf] 1 pass\n");
+
+	if (!gltf_material) {
+        printf("[GLTF_MODEL] No GLTF Material was defined.\n");
+        return NULL;
+    }
+	printf("[load_material_from_gltf] 2 pass\n");
+
+    // Initialize material properties with default values
+    memset(material, 0, sizeof(Material));
+    glm_vec4_copy((vec4){1.0f, 1.0f, 1.0f, 1.0f}, material->diffuse_color); // Default diffuse color
+    glm_vec3_copy((vec3){0.0f, 0.0f, 0.0f}, material->emissive_color);      // Default emissive color
+    material->metallic = 0.0f;                                            // Default metallic
+    material->roughness = 1.0f;                                           // Default roughness
+	printf("[load_material_from_gltf] 3 pass\n");
+
+	// Load diffuse texture
+	if (gltf_material->pbr_metallic_roughness.base_color_texture.texture) {
+		cgltf_texture *base_color_texture = gltf_material->pbr_metallic_roughness.base_color_texture.texture;
+		material->diffuse_texture_id = load_texture_from_gltf(base_color_texture, model_path);
+		if (!material->diffuse_texture_id) {
+			printf("Warning: Failed to load diffuse texture.\n");
+		} else {
+			printf("Success: Made diffuse texture with the following id \"%i\"\n", material->diffuse_texture_id);
+		}
+	} else {
+		printf("No diffuse texture defined in material.\n");
+	}
+
+	// Fallback default diffuse texture
+	if (!material->diffuse_texture_id) {
+		printf("Using default white texture as fallback for diffuse.\n");
+		glGenTextures(1, &material->diffuse_texture_id);
+		glBindTexture(GL_TEXTURE_2D, material->diffuse_texture_id);
+
+		unsigned char white_pixel[4] = {255, 255, 255, 255};
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, white_pixel);
+
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	}
+
+    // // Check if the material has a valid PBR metallic-roughness component
+    // if (gltf_material->has_pbr_metallic_roughness) {
+    //     // Diffuse color
+    //     if (sizeof(gltf_material->pbr_metallic_roughness.base_color_factor)) {
+    //         glm_vec4_copy(gltf_material->pbr_metallic_roughness.base_color_factor, material->diffuse_color);
+    //     }
+
+    //     // Metallic and roughness factors
+    //     if (gltf_material->pbr_metallic_roughness.metallic_factor >= 0.0f) {
+    //         material->metallic = gltf_material->pbr_metallic_roughness.metallic_factor;
+    //     }
+    //     if (gltf_material->pbr_metallic_roughness.roughness_factor >= 0.0f) {
+    //         material->roughness = gltf_material->pbr_metallic_roughness.roughness_factor;
+    //     }
+
+    //     // Load diffuse texture
+    //     if (gltf_material->pbr_metallic_roughness.base_color_texture.texture) {
+    //         cgltf_texture *base_color_texture = gltf_material->pbr_metallic_roughness.base_color_texture.texture;
+    //         material->diffuse_texture_id = load_texture_from_gltf(base_color_texture);
+    //         if (!material->diffuse_texture_id) {
+    //             printf("Warning: Failed to load diffuse texture.\n");
+    //         } else {
+	// 			printf("Success: Made diffuse texture with the following id \"%i\"\n", material->diffuse_texture_id);
+	// 		}
+    //     }
+
+    //     // Load metallic-roughness texture
+    //     if (gltf_material->pbr_metallic_roughness.metallic_roughness_texture.texture) {
+    //         cgltf_texture *metallic_roughness_texture = gltf_material->pbr_metallic_roughness.metallic_roughness_texture.texture;
+    //         material->metallic_roughness_texture_id = load_texture_from_gltf(metallic_roughness_texture);
+    //         if (!material->metallic_roughness_texture_id) {
+    //             printf("Warning: Failed to load metallic-roughness texture.\n");
+    //         } else {
+	// 			printf("Success: Made metallic with the following id \"%i\"\n", material->metallic_roughness_texture_id);
+	// 		}
+    //     }
+
+	// 	printf("[load_material_from_gltf] 4 pass\n");
+    // }
+	printf("[load_material_from_gltf] 5 pass\n");
+
+    // Load normal texture
+    if (gltf_material->normal_texture.texture) {
+        cgltf_texture *normal_texture = gltf_material->normal_texture.texture;
+        material->normal_texture_id = load_texture_from_gltf(normal_texture, model_path);
+        if (!material->normal_texture_id) {
+            printf("Warning: Failed to load normal texture.\n");
+        } else {
+			printf("Success: Made normal with the following id \"%i\"\n", material->normal_texture_id);
+		}
+	printf("[load_material_from_gltf] 6 pass\n");
+    }
+
+    // Load occlusion texture
+    if (gltf_material->occlusion_texture.texture) {
+        cgltf_texture *occlusion_texture = gltf_material->occlusion_texture.texture;
+        material->occlusion_texture_id = load_texture_from_gltf(occlusion_texture, model_path);
+        if (!material->occlusion_texture_id) {
+            printf("Warning: Failed to load occlusion texture.\n");
+        } else {
+			printf("Success: Made occlusion with the following id \"%i\"\n", material->occlusion_texture_id);
+		}
+	printf("[load_material_from_gltf] 7 pass\n");
+    }
+
+    // Load emissive texture
+    if (gltf_material->emissive_texture.texcoord) {
+        cgltf_texture *emissive_texture = gltf_material->emissive_texture.texture;
+        material->emissive_texture_id = load_texture_from_gltf(emissive_texture, model_path);
+        if (!material->emissive_texture_id) {
+            printf("Warning: Failed to load emissive texture.\n");
+        }  else {
+			printf("Success: Made emissive with the following id \"%i\"\n", material->emissive_texture_id);
+		}
+	printf("[load_material_from_gltf] 8 pass\n");
+    }
+
+    // Emissive color
+    if (sizeof(gltf_material->emissive_factor)) {
+        glm_vec3_copy(gltf_material->emissive_factor, material->emissive_color);
+    }
+	printf("[load_material_from_gltf] 9 pass\n");
+	printf("[load_material_from_gltf] All passed\n");
+
+    return material;
+}
+
+static Mesh *load_mesh_from_gltf(cgltf_mesh *gltf_mesh, const cgltf_data *gltf_data, cgltf_node *node, bool apply_parent_transform, Model *model, const char* model_path) {
     Mesh *mesh = mesh_create(gltf_mesh->name ? gltf_mesh->name : "unknown_or_singular_mesh_type");
 
     // Assume single primitive for simplicity
@@ -94,42 +231,31 @@ static Mesh *load_mesh_from_gltf(cgltf_mesh *gltf_mesh, const cgltf_data *gltf_d
             mesh->rotation[3] = node->rotation[0];
         }
     } else if (node && !apply_parent_transform) {
-		mesh->position[0] = model->position[0];
-		mesh->position[1] = model->position[1];
-		mesh->position[2] = model->position[2];
+        mesh->position[0] = model->position[0];
+        mesh->position[1] = model->position[1];
+        mesh->position[2] = model->position[2];
 
-		mesh->rotation[0] = model->rotation[1];
-		mesh->rotation[1] = model->rotation[2];
-		mesh->rotation[2] = model->rotation[3];
-		mesh->rotation[3] = model->rotation[0];
+        mesh->rotation[0] = model->rotation[1];
+        mesh->rotation[1] = model->rotation[2];
+        mesh->rotation[2] = model->rotation[3];
+        mesh->rotation[3] = model->rotation[0];
         
-		mesh->scale[0] = model->scale[0];
-		mesh->scale[1] = model->scale[2];
-		mesh->scale[2] = model->scale[1];
+        mesh->scale[0] = model->scale[0];
+        mesh->scale[1] = model->scale[2];
+        mesh->scale[2] = model->scale[1];
     }
 
-    // Apply parent transformation if requested
-    if (apply_parent_transform && node && node->parent) {
-        cgltf_node *parent_node = node->parent;
-        if (parent_node->has_translation) {
-            glm_vec3_mul(mesh->position, parent_node->translation, mesh->position);
-        }
-        if (parent_node->has_scale) {
-            glm_vec3_mul(mesh->scale, parent_node->scale, mesh->scale);
-        }
-        if (parent_node->has_rotation) {
-            glm_quat_mul(mesh->rotation, parent_node->rotation, mesh->rotation);
-        }
-    } else if (!apply_parent_transform) {
-		glm_vec3_copy(model->position, mesh->position);
-		glm_vec3_copy(model->scale, mesh->scale);
-		glm_quat_copy(model->rotation, mesh->rotation);
-	}
+    // Assign material to mesh (if the primitive has a material)
+    if (primitive->material) {
+        Material *material = load_material_from_gltf(primitive->material, model_path);
+        mesh_set_material(mesh, material);
+    }
 
     // Update transformation matrix
     mesh_update_transform_matrix(mesh);
     return mesh;
 }
+
 
 // Model transformation functions
 void model_set_position(Model *model, vec3 new_position) {
@@ -175,7 +301,7 @@ void model_apply_transform(Model *model) {
 }
 
 // GLTF loading function
-int model_load_gltf(Model *model, const char *texture_path, const char *file_path, bool apply_parent_transform) {
+int model_load_gltf(Model *model, const char *file_path, bool apply_parent_transform) {
     if (!model || !file_path) {
         printf("Invalid parameters: model or file_path is NULL.\n");
         return -1;
@@ -198,15 +324,19 @@ int model_load_gltf(Model *model, const char *texture_path, const char *file_pat
 
     model->mesh_count = gltf_data->meshes_count;
     model->meshes = malloc(sizeof(Mesh *) * model->mesh_count);
-    if (!model->meshes) {
+    model->materials = malloc(sizeof(Material *) * model->mesh_count);
+
+    if (!model->meshes || !model->materials) {
         cgltf_free(gltf_data);
-        printf("Failed to allocate memory for meshes.\n");
+        printf("Failed to allocate memory for meshes or materials.\n");
         return -3;
     }
 
     for (size_t i = 0; i < gltf_data->meshes_count; i++) {
         cgltf_mesh *gltf_mesh = &gltf_data->meshes[i];
-        model->meshes[i] = load_mesh_from_gltf(gltf_mesh, gltf_data, &gltf_data->nodes[i], apply_parent_transform, model);
+        cgltf_node *node = &gltf_data->nodes[i]; // Assume nodes are indexed like meshes for simplicity
+
+        model->meshes[i] = load_mesh_from_gltf(gltf_mesh, gltf_data, node, apply_parent_transform, model, file_path);
         if (!model->meshes[i]) {
             printf("Failed to load mesh %zu.\n", i);
             for (size_t j = 0; j < i; j++) {
@@ -216,40 +346,15 @@ int model_load_gltf(Model *model, const char *texture_path, const char *file_pat
             cgltf_free(gltf_data);
             return -4;
         }
-    }
 
-    if (texture_path) {
-        int width, height, channels;
-        unsigned char *data = stbi_load(texture_path, &width, &height, &channels, 0);
-
-        if (data) {
-            GLuint texture;
-            glGenTextures(1, &texture);
-            glBindTexture(GL_TEXTURE_2D, texture);
-
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-            GLenum format = (channels == 4) ? GL_RGBA : GL_RGB;
-            glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
-            glGenerateMipmap(GL_TEXTURE_2D);
-
-            glBindTexture(GL_TEXTURE_2D, 0);
-            stbi_image_free(data);
-
-            model->texture_id = texture;
-            printf("Created texture with ID: %u\n", texture);
+        // Load and assign the material to the model
+        if (gltf_mesh->primitives[0].material) {
+			printf("GLTF_MESH DOES HAVE A MATERIAL!\n");
+            model->materials[i] = load_material_from_gltf(gltf_mesh->primitives[0].material, file_path);
         } else {
-            printf("Failed to load texture: %s\n", texture_path);
-        }
+			printf("GLTF_MESH NO MATERIALS!\n");
+		}
     }
-
-    model_set_position(model, GLM_VEC3_ZERO);
-    model_set_scale(model, GLM_VEC3_ONE);
-    model_set_rotation(model, (vec4){1.0f, 0.0f, 0.0f, 0.0f});
-    model_apply_transform(model);
 
     cgltf_free(gltf_data);
     return 1;
