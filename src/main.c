@@ -31,7 +31,7 @@ int main() {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 4);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_COMPAT_PROFILE); // Use core profile for modern OpenGL
     glfwWindowHint(GLFW_DECORATED, FALSE);
-    glfwWindowHint(GLFW_SAMPLES, 16);
+    // glfwWindowHint(GLFW_SAMPLES, 16);
 
     GLFWmonitor* primary_monitor = glfwGetPrimaryMonitor();
     if (!primary_monitor) {
@@ -86,7 +86,7 @@ int main() {
 	enableOpenGLDebugging();
   
     glEnable(GL_DEPTH_TEST);
-    glEnable(GL_MULTISAMPLE);
+    // glEnable(GL_MULTISAMPLE);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 

@@ -12,20 +12,17 @@
 
 // Function to load a texture from the GLTF data
 static Material *load_material_from_gltf(cgltf_material *gltf_material, const char* model_path) {
-	printf("[load_material_from_gltf] called.\n");
     // Allocate memory for the Material struct
     Material *material = malloc(sizeof(Material));
     if (!material) {
         printf("[GLTF_MODEL] Failed to allocate memory for material.\n");
         return NULL;
     }
-	printf("[load_material_from_gltf] 1 pass\n");
 
 	if (!gltf_material) {
         printf("[GLTF_MODEL] No GLTF Material was defined.\n");
         return NULL;
     }
-	printf("[load_material_from_gltf] 2 pass\n");
 
     // Initialize material properties with default values
     memset(material, 0, sizeof(Material));
@@ -33,7 +30,6 @@ static Material *load_material_from_gltf(cgltf_material *gltf_material, const ch
     glm_vec3_copy((vec3){0.0f, 0.0f, 0.0f}, material->emissive_color);      // Default emissive color
     material->metallic = 0.0f;                                            // Default metallic
     material->roughness = 1.0f;                                           // Default roughness
-	printf("[load_material_from_gltf] 3 pass\n");
 
 	// Load diffuse texture
 	if (gltf_material->pbr_metallic_roughness.base_color_texture.texture) {
@@ -77,20 +73,20 @@ static Material *load_material_from_gltf(cgltf_material *gltf_material, const ch
     //     }
 
     //     // Load diffuse texture
-    //     if (gltf_material->pbr_metallic_roughness.base_color_texture.texture) {
-    //         cgltf_texture *base_color_texture = gltf_material->pbr_metallic_roughness.base_color_texture.texture;
-    //         material->diffuse_texture_id = load_texture_from_gltf(base_color_texture);
-    //         if (!material->diffuse_texture_id) {
-    //             printf("Warning: Failed to load diffuse texture.\n");
-    //         } else {
-	// 			printf("Success: Made diffuse texture with the following id \"%i\"\n", material->diffuse_texture_id);
-	// 		}
-    //     }
+    //     // if (gltf_material->pbr_metallic_roughness.base_color_texture.texture) {
+    //     //     cgltf_texture *base_color_texture = gltf_material->pbr_metallic_roughness.base_color_texture.texture;
+    //     //     material->diffuse_texture_id = load_texture_from_gltf(base_color_texture, model_path);
+    //     //     if (!material->diffuse_texture_id) {
+    //     //         printf("Warning: Failed to load diffuse texture.\n");
+    //     //     } else {
+	// 	// 		printf("Success: Made diffuse texture with the following id \"%i\"\n", material->diffuse_texture_id);
+	// 	// 	}
+    //     // }
 
     //     // Load metallic-roughness texture
     //     if (gltf_material->pbr_metallic_roughness.metallic_roughness_texture.texture) {
     //         cgltf_texture *metallic_roughness_texture = gltf_material->pbr_metallic_roughness.metallic_roughness_texture.texture;
-    //         material->metallic_roughness_texture_id = load_texture_from_gltf(metallic_roughness_texture);
+    //         material->metallic_roughness_texture_id = load_texture_from_gltf(metallic_roughness_texture, model_path);
     //         if (!material->metallic_roughness_texture_id) {
     //             printf("Warning: Failed to load metallic-roughness texture.\n");
     //         } else {
@@ -98,9 +94,7 @@ static Material *load_material_from_gltf(cgltf_material *gltf_material, const ch
 	// 		}
     //     }
 
-	// 	printf("[load_material_from_gltf] 4 pass\n");
     // }
-	printf("[load_material_from_gltf] 5 pass\n");
 
     // Load normal texture
     if (gltf_material->normal_texture.texture) {
@@ -111,7 +105,6 @@ static Material *load_material_from_gltf(cgltf_material *gltf_material, const ch
         } else {
 			printf("Success: Made normal with the following id \"%i\"\n", material->normal_texture_id);
 		}
-	printf("[load_material_from_gltf] 6 pass\n");
     }
 
     // Load occlusion texture
@@ -123,7 +116,6 @@ static Material *load_material_from_gltf(cgltf_material *gltf_material, const ch
         } else {
 			printf("Success: Made occlusion with the following id \"%i\"\n", material->occlusion_texture_id);
 		}
-	printf("[load_material_from_gltf] 7 pass\n");
     }
 
     // Load emissive texture
@@ -135,15 +127,12 @@ static Material *load_material_from_gltf(cgltf_material *gltf_material, const ch
         }  else {
 			printf("Success: Made emissive with the following id \"%i\"\n", material->emissive_texture_id);
 		}
-	printf("[load_material_from_gltf] 8 pass\n");
     }
 
     // Emissive color
     if (sizeof(gltf_material->emissive_factor)) {
         glm_vec3_copy(gltf_material->emissive_factor, material->emissive_color);
     }
-	printf("[load_material_from_gltf] 9 pass\n");
-	printf("[load_material_from_gltf] All passed\n");
 
     return material;
 }
@@ -349,11 +338,8 @@ int model_load_gltf(Model *model, const char *file_path, bool apply_parent_trans
 
         // Load and assign the material to the model
         if (gltf_mesh->primitives[0].material) {
-			printf("GLTF_MESH DOES HAVE A MATERIAL!\n");
             model->materials[i] = load_material_from_gltf(gltf_mesh->primitives[0].material, file_path);
-        } else {
-			printf("GLTF_MESH NO MATERIALS!\n");
-		}
+        }
     }
 
     cgltf_free(gltf_data);

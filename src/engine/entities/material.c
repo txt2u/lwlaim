@@ -80,8 +80,6 @@ char *find_file_in_directory(const char *base_dir, const char *target_file) {
 
 // Function to load a texture from a GLTF texture structure
 GLuint load_texture_from_gltf(cgltf_texture *gltf_texture, const char *model_path) {
-    printf("[load_texture_from_gltf] called.\n");
-
     // Get parent directory from the model path
     char parent_dir[1024];
     get_parent_directory(model_path, parent_dir);

@@ -11,6 +11,7 @@ typedef struct {
     ALuint source;       // Audio source
     bool is_playing;     // Playback state
     bool is_muted;       // Mute state
+	bool played;
     float volume;        // Current volume
 } Sound;
 
@@ -32,7 +33,7 @@ void sound_pause(Sound* sound);
 void sound_resume(Sound* sound);
 
 // Spatial audio: relative to world position (rtwp)
-void sound_play_once_rtwp(Sound* sound, float sound_pos[3], float listener_pos[3], float listener_dir[3]);
-void sound_play_repeat_rtwp(Sound* sound, float sound_pos[3], float listener_pos[3], float listener_dir[3]);
+void sound_play_once_rtwp(Sound* sound, float sound_pos[3], float listener_pos[3], float listener_dir[3], float listener_up[3]);
+void sound_play_repeat_rtwp(Sound* sound, float sound_pos[3], float listener_pos[3], float listener_dir[3], float listener_up[3]);
 
 #endif // SOUND_H

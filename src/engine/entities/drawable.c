@@ -42,7 +42,6 @@ void draw_manager_init_from_mesh(Drawable* p_drawable, Mesh* mesh, const char* n
     }
 
     // Unbind VAO after setup
-    glBindVertexArray(0);
 
     // Initialize model matrix to identity
     glm_mat4_identity(p_drawable->model_matrix);

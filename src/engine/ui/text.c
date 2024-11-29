@@ -140,9 +140,8 @@ void font_init(Font *font, const char *font_path, float font_size, float space_s
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
-
-    glBindVertexArray(0);
 }
+
 void font_render_text(Font *font, const char *text, float x, float y, vec3 color) {
     glUseProgram(font->shader_program);
     glUniform3fv(glGetUniformLocation(font->shader_program, "textColor"), 1, color);
@@ -207,7 +206,6 @@ void font_render_text(Font *font, const char *text, float x, float y, vec3 color
         x += ch.advance;
     }
 
-    glBindVertexArray(0);
     glBindTexture(GL_TEXTURE_2D, 0);
 }
 

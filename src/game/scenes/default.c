@@ -29,6 +29,9 @@
 #include <entities/model.h>
 #include <entities/ecs.h>
 
+#include <lighting/light.h>
+#include <entities/static/cube.h>
+
 #include <output/sound.h>
 #include <wav.h>
 
@@ -67,6 +70,10 @@ static Drawable drawable;
 
 static Sound sound;
 static Button my_button;
+
+static Cube DebugLightCube;
+static Light PointLight;
+static vec3 LightPosition;
 
 void default_scene_update(Scene* self) {
 	// Get framebuffer size
@@ -118,6 +125,13 @@ void default_scene_update(Scene* self) {
 	GLuint texture_loc = glGetUniformLocation(shader.id, "texture1");
 	glUniform1i(texture_loc, 0);  // Set it to texture unit 0
 
+	// ! Point light.
+	create_point_light(&PointLight, LightPosition, (vec3){0.9f, 0.87f, 0.9f}, 1.0f);
+
+	// Pass the camera position into the fragment shader uniform.
+	GLuint camera_position = glGetUniformLocation(shader.id, "cameraPosition");
+    glUniform3fv(camera_position, 1, camera.position);
+
 	// For each mesh in the model, apply the mesh's local transformation
 	for (int i = 0; i < model.mesh_count; i++) {
 		// Combine the mesh's local transformation with the model's global transformation
@@ -134,6 +148,15 @@ void default_scene_update(Scene* self) {
 		// Draw the mesh with the combined transformation
 		draw_manager_draw(&drawable, model.meshes[i]->name);
 	}
+
+	// ! DEBUG LIGHT CUBE
+	shader_use(&DebugLightCube.shader_program);
+
+	set_debug_cube_model_matrix(&DebugLightCube);
+	set_debug_cube_view_matrix(&DebugLightCube, view);
+	set_debug_cube_projection_matrix(&DebugLightCube, projection);
+
+	draw_debug_cube(&DebugLightCube);
 
 	// Use image shader program
 	shader_use(&image_shader);
@@ -164,6 +187,8 @@ void default_scene_update(Scene* self) {
 
 	bool hover = button_check_hover(&my_button, cursor_x_position, cursor_y_position);
 	// bool click = button_check_click(&my_button, cursor_x_position, cursor_y_position, glfwGetMouseButton(self->window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS);
+
+	sound_play_once_rtwp(&sound, (vec3){0.0f, 0.0f, 0.0f}, camera.position, camera.front, camera.worldUp);
 
 	if (hover) {
 		button_scale(&my_button, 1.1f, 1.1f);
@@ -285,7 +310,7 @@ void default_scene_render(Scene* self) {
 	// ! LOAD GLTF MODEL HERE
     if (!model_load_gltf(
 		&model, 
-		"resources/static/test.gltf",
+		"resources/static/anime_girl_texture/agirl.gltf",
 		true)
 	) {
         fprintf(stderr, "Failed to load GLTF model!\n");
@@ -294,8 +319,8 @@ void default_scene_render(Scene* self) {
     printf("Loaded gltf model!\n");
 
 	// model_set_position(&model, GLM_VEC3_ZERO);
-	// model_set_scale(&model, (vec3){ 4.0f, 4.0f, 4.0f });
-	model_set_rotation(&model, (vec4){ 0.0f, 0.0f, 0.0f, 1.0f });
+	model_set_scale(&model, (vec3){ 0.5f, 0.5f, 0.5f });
+	model_set_rotation(&model, (vec4){ -90.0f, 0.0f, 0.0f, 1.0f });
 	model_apply_transform(&model);
 
 	// Initialize the meshes as drawables
@@ -334,7 +359,7 @@ void default_scene_render(Scene* self) {
 	ALsizei size, freq;
 	ALenum format;
 	ALvoid* data;
-	load_wav("resources/audio/stress.wav", &format, &data, &size, &freq); // Implement your loader
+	load_wav("resources/audio/crystal.wav", &format, &data, &size, &freq); // Implement your loader
 	alBufferData(sound.buffer, format, data, size, freq);
 	free(data);
 
@@ -342,10 +367,26 @@ void default_scene_render(Scene* self) {
 	sound_attach_buffer(&sound);
 
 	// Initialize sound properties
-	sound_set_volume(&sound, 0.0f);
+	sound_set_volume(&sound, 1.0f);
 
-	// Play the sound
-	sound_play_once(&sound);
+	// ! Debug light cube
+
+	// * Create the cube shaders
+	create_debug_cube_shaders(
+		&DebugLightCube, 
+		"resources/shaders/debug/vertex.glsl", 
+		"resources/shaders/debug/fragment.glsl"
+	);
+
+	vec3 c_size = {0.3f, 0.3f, 0.3f};
+
+	glm_vec3_copy((vec3){ 0.0f, 12.0f, 6.0f }, LightPosition);
+	vec4 c_color = {1.0f, 1.0f, 1.0f, 1.0f};
+
+	create_debug_cube(&DebugLightCube, c_size, LightPosition, c_color);
+
+	// ! Light
+	create_light(&PointLight, shader.id);
 }
 
 void default_scene_cleanup() {

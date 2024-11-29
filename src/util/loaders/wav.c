@@ -3,7 +3,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <AL/al.h>
-#include <wav.h>
 #include <string.h>
 
 bool load_wav(const char* filename, ALenum* format, ALvoid** data, ALsizei* size, ALsizei* freq) {
@@ -60,16 +59,8 @@ bool load_wav(const char* filename, ALenum* format, ALvoid** data, ALsizei* size
         return false;
     }
 
-    // Determine OpenAL format
-    if (num_channels == 1) {
-        *format = (bits_per_sample == 8) ? AL_FORMAT_MONO8 : AL_FORMAT_MONO16;
-    } else if (num_channels == 2) {
-        *format = (bits_per_sample == 8) ? AL_FORMAT_STEREO8 : AL_FORMAT_STEREO16;
-    } else {
-        fprintf(stderr, "Unsupported channel count: %d\n", num_channels);
-        fclose(file);
-        return false;
-    }
+    // Set OpenAL format to mono, regardless of the original number of channels
+    *format = (bits_per_sample == 8) ? AL_FORMAT_MONO8 : AL_FORMAT_MONO16;
 
     *freq = sample_rate;
 
@@ -102,6 +93,29 @@ bool load_wav(const char* filename, ALenum* format, ALvoid** data, ALsizei* size
 
     fread(*data, 1, subchunk2_size, file);
     fclose(file);
+
+    // If the file was stereo, downmix it to mono
+    if (num_channels == 2) {
+        int16_t* stereo_data = (int16_t*)*data;
+        int16_t* mono_data = (int16_t*)malloc(*size / 2); // Mono data will be half the size of stereo data
+
+        if (!mono_data) {
+            fprintf(stderr, "Failed to allocate memory for downmixed data\n");
+            free(*data);
+            return false;
+        }
+
+        size_t num_samples = *size / sizeof(int16_t);
+        for (size_t i = 0, j = 0; i < num_samples; i += 2, ++j) {
+            // Average left and right channels to create mono data
+            mono_data[j] = (stereo_data[i] + stereo_data[i + 1]) / 2;
+        }
+
+        // Free the original stereo data and point to the mono data
+        free(*data);
+        *data = mono_data;
+        *size = *size / 2;  // Update size for mono data
+    }
 
     return true;
 }

@@ -29,6 +29,12 @@ void camera_update(Camera* camera) {
     glm_cross(camera->right, camera->front, camera->up);
 }
 
+void get_camera_directions(Camera* camera, float* camera_x, float* camera_y, float* camera_z) {
+    *camera_x = camera->right[0];  // X component of the right vector
+    *camera_y = camera->up[1];     // Y component of the up vector
+    *camera_z = camera->front[2];  // Z component of the front vector
+}
+
 void camera_process_keyboard(Camera* camera, GLFWwindow* window, float deltaTime) {
     // Calculate the velocity based on movement speed and deltaTime
     float velocity = camera->movementSpeed * deltaTime;

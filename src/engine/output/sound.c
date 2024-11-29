@@ -84,18 +84,56 @@ void sound_resume(Sound* sound) {
     }
 }
 
-void sound_play_once_rtwp(Sound* sound, float sound_pos[3], float listener_pos[3], float listener_dir[3]) {
-    alListener3f(AL_POSITION, listener_pos[0], listener_pos[1], listener_pos[2]);  // Set listener position
-    alListener3f(AL_ORIENTATION, listener_dir[0], listener_dir[1], listener_dir[2]); // Set listener direction
+void sound_play_once_rtwp(Sound* sound, float sound_pos[3], float listener_pos[3], float listener_dir[3], float listener_up[3]) {
+    // Update listener position
+    alListener3f(AL_POSITION, listener_pos[0], listener_pos[1], listener_pos[2]);
 
-    alSource3f(sound->source, AL_POSITION, sound_pos[0], sound_pos[1], sound_pos[2]); // Set sound source position
-    sound_play_once(sound); // Play the sound once
+    // Correct listener orientation: forward direction (listener_dir) and up direction (assumed Y axis: 0,1,0)
+    float listener_orientation[] = { 
+        listener_dir[0], listener_dir[1], listener_dir[2], // forward direction
+        listener_up[0], listener_up[1], listener_up[2]  // up direction (Y-axis)
+    };
+    alListenerfv(AL_ORIENTATION, listener_orientation); // Set listener orientation
+
+    // Set attenuation for the source (this controls how the sound fades with distance)
+    // AL_ROLLOFF_FACTOR: 1.0 means the sound will gradually fade with distance
+    alSourcef(sound->source, AL_ROLLOFF_FACTOR, 1.0f);  // Attenuate sound over distance
+    alSourcef(sound->source, AL_REFERENCE_DISTANCE, 5.0f);  // Sound at full volume within 5 units
+    alSourcef(sound->source, AL_MAX_DISTANCE, 50.0f);      // Maximum audible distance is 50 units
+
+    // Update sound source position (this moves the sound in 3D space)
+    alSourcefv(sound->source, AL_POSITION, sound_pos);
+
+    // Check if the sound is already playing
+    ALint state;
+    alGetSourcei(sound->source, AL_SOURCE_STATE, &state);
+
+    // Play the sound only if it's not already playing
+    if (state != AL_PLAYING && !sound->played) {
+        sound_play_once(sound);
+		sound->played = true;
+    }
 }
 
-void sound_play_repeat_rtwp(Sound* sound, float sound_pos[3], float listener_pos[3], float listener_dir[3]) {
-    alListener3f(AL_POSITION, listener_pos[0], listener_pos[1], listener_pos[2]);  // Set listener position
-    alListener3f(AL_ORIENTATION, listener_dir[0], listener_dir[1], listener_dir[2]); // Set listener direction
+void sound_play_repeat_rtwp(Sound* sound, float sound_pos[3], float listener_pos[3], float listener_dir[3], float listener_up[3]) {
+    // Update listener position
+    alListener3f(AL_POSITION, listener_pos[0], listener_pos[1], listener_pos[2]);
 
-    alSource3f(sound->source, AL_POSITION, sound_pos[0], sound_pos[1], sound_pos[2]); // Set sound source position
-    sound_play_repeat(sound); // Play the sound on repeat
+    // Correct listener orientation: forward direction (listener_dir) and up direction (assumed Y axis: 0,1,0)
+    float listener_orientation[] = { 
+        listener_dir[0], listener_dir[1], listener_dir[2], // forward direction
+        listener_up[0], listener_up[1], listener_up[2]  // up direction (Y-axis)
+    };
+    alListenerfv(AL_ORIENTATION, listener_orientation); // Set listener orientation
+
+    // Set attenuation for the source
+    alSourcef(sound->source, AL_ROLLOFF_FACTOR, 1.0f);  // Attenuate sound over distance
+    alSourcef(sound->source, AL_REFERENCE_DISTANCE, 5.0f);  // Sound at full volume within 5 units
+    alSourcef(sound->source, AL_MAX_DISTANCE, 50.0f);      // Maximum audible distance is 50 units
+
+    // Set sound source position
+    alSourcefv(sound->source, AL_POSITION, sound_pos);
+
+    // Play the sound on repeat (looping)
+    sound_play_repeat(sound); // This already handles looping
 }

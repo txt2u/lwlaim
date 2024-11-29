@@ -28,6 +28,8 @@ void camera_process_mouse(Camera* camera, double xpos, double ypos);
 void camera_get_view_matrix(Camera* camera, mat4 view);
 void camera_get_projection_matrix(Camera* camera, mat4 projection, int width, int height);
 
+void get_camera_directions(Camera* camera, float* camera_x, float* camera_y, float* camera_z);
+
 void set_camera_near(Camera* camera, float near);
 void set_camera_far(Camera* camera, float far);
 

@@ -13,6 +13,7 @@ ShaderProgram shader_create(const char* vertexSrc, const char* fragmentSrc);
 
 // Use the shader program
 void shader_use(const ShaderProgram* shader);
+void shader_disband();
 
 // Free the shader program resources
 void shader_destroy(ShaderProgram* shader);

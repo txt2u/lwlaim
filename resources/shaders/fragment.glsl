@@ -1,7 +1,16 @@
 #version 410 core
 
+// Structure to represent light (Directional, Point, and Spotlight)
+struct Light {
+    vec3 position;   // Position of light
+    vec3 color;      // Color of light
+    // float intensity; // Intensity of light
+};
+
+// Input from vertex shader
 in vec3 fragNormal;       // Normal passed from vertex shader
 in vec2 fragTexCoord;     // Texture coordinates passed from vertex shader
+in vec3 fragPosition;     // World-space position of the fragment
 out vec4 fragColor;       // Final output color
 
 // Uniforms for material textures
@@ -17,7 +26,12 @@ uniform vec3 emissiveColor;   // Fallback emissive color
 uniform float metallic;       // Fallback metallic value
 uniform float roughness;      // Fallback roughness value
 
+uniform vec3 cameraPosition;
+
+uniform Light light;
+
 void main() {
+    // Default values for material properties
     vec3 baseColor = diffuseColor.rgb;  // Default to uniform diffuse color
     vec3 normalMap = vec3(0.0, 0.0, 1.0); // Default normal (flat)
     float finalMetallic = metallic;     // Default metallic
@@ -50,20 +64,23 @@ void main() {
         occlusion = texture(occlusionTexture, fragTexCoord).r;
     }
 
-    // Lighting calculation (simple example)
-    vec3 lightDir = normalize(vec3(0.5, 0.5, -1.0)); // Directional light
-    vec3 viewDir = normalize(vec3(0.0, 0.0, 1.0));   // View direction (camera)
-    vec3 halfDir = normalize(lightDir + viewDir);    // Halfway vector
+	float ambientStrength = 0.2;
+    vec3 ambient = ambientStrength * vec3(1.0);
 
-    float diffuse = max(dot(normalMap, lightDir), 0.0);
-    float specular = pow(max(dot(normalMap, halfDir), 0.0), 32.0);
+	vec3 norm = normalize(fragNormal);
+	vec3 lightDir = normalize(light.position - fragPosition);  
 
-    // Combine results using metallic-roughness
-    vec3 reflectedColor = mix(vec3(0.04), baseColor, finalMetallic);
-    vec3 lighting = occlusion * diffuse * baseColor + specular * reflectedColor;
+	float diff = max(dot(norm, lightDir), 0.0);
+	vec3 diffuse = diff * light.color;
 
-    // Add emissive color
-    vec3 finalColor = lighting + emissive;
+	float specularStrength = 0.2;
+	float specularExponent = 10.0; // Soft, subtle specular highlight for skin
+	vec3 viewDir = normalize(cameraPosition - fragPosition);
+	vec3 reflectDir = reflect(-lightDir, norm);  
 
-    fragColor = vec4(finalColor, diffuseColor.a);
+	float spec = pow(max(dot(viewDir, reflectDir), 0.0), specularExponent);
+	vec3 specular = specularStrength * spec * light.color;  
+
+	vec3 result = (ambient + diffuse + specular) * baseColor;
+    fragColor = vec4(result, 1.0);
 }

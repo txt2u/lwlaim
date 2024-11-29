@@ -61,9 +61,21 @@ ShaderProgram shader_create(const char* vertexSrc, const char* fragmentSrc) {
 
 // Use the shader program
 void shader_use(const ShaderProgram* shader) {
+	if (shader->id == 0) {
+		fprintf(stderr, "[fn shader_use] Trying to use a shader program with the id of 0.\n");
+		return;
+	}
+
     if (shader && shader->id) {
+		// Todo: vvvvvvvvvvv -> Enable later
+		// shader_disband();
+		
         glUseProgram(shader->id);
     }
+}
+
+void shader_disband() {
+	glUseProgram(0);
 }
 
 // Free the shader program resources
