@@ -310,7 +310,7 @@ void default_scene_render(Scene* self) {
 	// ! LOAD GLTF MODEL HERE
     if (!model_load_gltf(
 		&model, 
-		"resources/static/anime_girl_texture/agirl.gltf",
+		"resources/static/copyrighted/anime_girl_texture/agirl.gltf",
 		true)
 	) {
         fprintf(stderr, "Failed to load GLTF model!\n");
@@ -359,7 +359,7 @@ void default_scene_render(Scene* self) {
 	ALsizei size, freq;
 	ALenum format;
 	ALvoid* data;
-	load_wav("resources/audio/crystal.wav", &format, &data, &size, &freq); // Implement your loader
+	load_wav("resources/audio/copyrighted/crystal.wav", &format, &data, &size, &freq); // Implement your loader
 	alBufferData(sound.buffer, format, data, size, freq);
 	free(data);
 
