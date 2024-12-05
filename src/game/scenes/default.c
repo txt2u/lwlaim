@@ -32,18 +32,16 @@
 #include <lighting/light.h>
 #include <entities/static/cube.h>
 
+#include <scenes/skybox.h>
+
 #include <output/sound.h>
 #include <wav.h>
 
-static ShaderProgram shader;
-static ShaderProgram image_shader;
-static ShaderProgram text_shader;
-static ShaderProgram button_shader;
+static ShaderProgram shader, image_shader, text_shader, button_shader, skybox_shader;
 static Buffers buffers;
 
 static Crosshair crosshair;
 
-static GLuint texture;
 static Camera camera;
     
 static float deltaTime = 0.0f, lastFrame = 0.0f;
@@ -68,12 +66,139 @@ static Image background_image;
 static Model model; // A struct to hold GLTF model data
 static Drawable drawable;
 
+static Model player_model;
+static Drawable p_drawable;
+
 static Sound sound;
 static Button my_button;
 
 static Cube DebugLightCube;
 static Light PointLight;
 static vec3 LightPosition;
+
+// ^ >>>>>>>>>>>>>> Skybox 
+static Skybox skybox;
+static mat4 skybox_view, skybox_projection, skybox_model;
+// ^ <<<<<<<<<<<<<< Skybox 
+
+// & Default scene shaders
+static void setup_default_scene_shaders() {
+	// ! Default Shader
+	// Compile shaders and create shader program
+    char* vertexShaderSource = read_file("resources/shaders/vertex.glsl");
+    char* fragmentShaderSource = read_file("resources/shaders/fragment.glsl");
+    if (!vertexShaderSource || !fragmentShaderSource) {
+        fprintf(stderr, "Failed to load shader sources!\n");
+        return;
+    }
+
+    shader = shader_create(vertexShaderSource, fragmentShaderSource);
+    free(vertexShaderSource);
+    free(fragmentShaderSource);
+
+    if (shader.id == 0) {
+        fprintf(stderr, "Shader program creation failed!\n");
+        return;
+    }
+    printf("Main shader program created.\n");
+
+	// & >>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+	// ! Text Shader
+	// Initialize text renderer
+	// Compile shaders and create shader program
+    char* t_vertexShaderSource = read_file("resources/shaders/text/vertex.glsl");
+    char* t_fragmentShaderSource = read_file("resources/shaders/text/fragment.glsl");
+    if (!t_vertexShaderSource || !t_fragmentShaderSource) {
+        fprintf(stderr, "Failed to load text shader sources!\n");
+        return;
+    }
+
+	text_shader = shader_create(t_vertexShaderSource, t_fragmentShaderSource);
+    free(t_vertexShaderSource);
+    free(t_fragmentShaderSource);
+
+    if (text_shader.id == 0) {
+        fprintf(stderr, "Shader program creation failed!\n");
+        return;
+    }
+    printf("Text shader program created.\n");
+	
+	// & >>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+	// ! Image Shader
+	// Initialize image renderer
+	// Compile shaders and create shader program
+    char* i_vertexShaderSource = read_file("resources/shaders/image/vertex.glsl");
+    char* i_fragmentShaderSource = read_file("resources/shaders/image/fragment.glsl");
+    if (!i_vertexShaderSource || !i_fragmentShaderSource) {
+        fprintf(stderr, "Failed to load image shader sources!\n");
+        return;
+    }
+
+	image_shader = shader_create(i_vertexShaderSource, i_fragmentShaderSource);
+    free(i_vertexShaderSource);
+    free(i_fragmentShaderSource);
+
+    if (image_shader.id == 0) {
+        fprintf(stderr, "Shader program creation failed!\n");
+        return;
+    }
+    printf("Image shader program created.\n");
+	
+	// & >>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+	// ! Button Shader
+	// Initialize button renderer
+	// Compile shaders and create shader program
+    char* b_vertexShaderSource = read_file("resources/shaders/button/vertex.glsl");
+    char* b_fragmentShaderSource = read_file("resources/shaders/button/fragment.glsl");
+    if (!b_vertexShaderSource || !b_fragmentShaderSource) {
+        fprintf(stderr, "Failed to load image shader sources!\n");
+        return;
+    }
+
+	button_shader = shader_create(b_vertexShaderSource, b_fragmentShaderSource);
+    free(b_vertexShaderSource);
+    free(b_fragmentShaderSource);
+
+    if (button_shader.id == 0) {
+        fprintf(stderr, "Shader program creation failed!\n");
+        return;
+    }
+    printf("Button shader program created.\n");
+	
+	// & >>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+	// ! Skybox Shader
+	// Initialize skybox renderer
+	// Compile shaders and create shader program
+    char* sk_vertexShaderSource = read_file("resources/shaders/skybox/vertex.glsl");
+    char* sk_fragmentShaderSource = read_file("resources/shaders/skybox/fragment.glsl");
+    if (!sk_vertexShaderSource || !sk_fragmentShaderSource) {
+        fprintf(stderr, "Failed to load image shader sources!\n");
+        return;
+    }
+
+	skybox_shader = shader_create(sk_vertexShaderSource, sk_fragmentShaderSource);
+    free(sk_vertexShaderSource);
+    free(sk_fragmentShaderSource);
+    printf("Skybox shader program created.\n");
+	
+	// & >>>>>>>>>>>>>>>>>>>>>>>>>>>>
+}
+
+// Function to print a 4x4 matrix for debugging
+void print_matrix(const char* name, mat4 matrix) {
+    printf("Matrix: %s\n", name);
+    for (int row = 0; row < 4; ++row) {
+        for (int col = 0; col < 4; ++col) {
+            printf("%8.3f ", matrix[row][col]);
+        }
+        printf("\n");
+    }
+    printf("\n");
+}
 
 void default_scene_update(Scene* self) {
 	// Get framebuffer size
@@ -97,20 +222,48 @@ void default_scene_update(Scene* self) {
 	camera_process_keyboard(&camera, self->window, deltaTime);
 	camera_process_mouse(&camera, cursor_x_position, cursor_y_position);
 
-	// Use the shader program
-	shader_use(&shader);
+	// Get the MVP matrices
+	camera_get_view_matrix(&camera, view);
+	camera_get_projection_matrix(&camera, projection, (float)framebufferWidth, (float)framebufferHeight);
 
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-	glClear(GL_COLOR_BUFFER_BIT);
-	glClear(GL_DEPTH_BUFFER_BIT);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	// Use the skybox shader program
+	shader_use(&skybox_shader);
+
+	// Start with the identity matrix for the skybox view
+	glm_mat4_identity(skybox_view);
+	glm_mat4_identity(skybox_model);
+
+	glm_rotate(skybox_view, glm_rad(-camera.yaw), (vec3){ 0.0f, 1.0f, 0.0f });
+	glm_rotate(skybox_view, glm_rad(camera.pitch), (vec3){ 1.0f, 0.0f, 0.0f });
+
+	// Set translation part of the view matrix to 0, keeping only the rotation for the skybox
+	skybox_view[3][0] = 0.0f; // tx
+	skybox_view[3][1] = 0.0f; // ty
+	skybox_view[3][2] = 0.0f; // tz
+	skybox_view[3][3] = 1.0f; // hom
+
+	// Apply a scaling transformation to the skybox model matrix
+	float scale_factor = 0.01f; // Adjust this value to control the size of the skybox
+	glm_scale(skybox_model, (vec3){scale_factor, scale_factor, scale_factor}); // Scale the model matrix
+
+	glm_perspective(glm_rad(camera.fov), 
+		(float)framebufferWidth / (float)framebufferHeight, 
+		camera.near, 
+		camera.far * 1000.0f, 
+		skybox_projection);
+
+	// Use the skybox for rendering
+	skybox_use(&skybox, skybox_projection, skybox_view, skybox_model);
+
+	// Use the shader program
+	shader_use(&shader);
 
 	// Render the scene
 	camera_update(&camera);
 
-	// Set up the MVP matrices
-	camera_get_view_matrix(&camera, view);
-	camera_get_projection_matrix(&camera, projection, framebufferWidth, framebufferHeight);
-	
 	// Set projection matrix in shader
 	GLuint model_loc = glGetUniformLocation(shader.id, "model");
 	GLuint view_loc = glGetUniformLocation(shader.id, "view");
@@ -149,6 +302,21 @@ void default_scene_update(Scene* self) {
 		draw_manager_draw(&drawable, model.meshes[i]->name);
 	}
 
+	// Set the scale for the player model
+	model_set_position(&player_model, (vec3){camera.position[0], camera.position[1] - 2.0f, camera.position[2]}); // Use camera position for the player's position
+	model_set_rotation(&player_model, (vec4){ 0.0f, 0.0f, 0.0f, 1.0f });
+
+	model_apply_transform(&player_model);
+
+	// Draw each mesh with the updated transformation
+	for (int i = 0; i < player_model.mesh_count; i++) {
+		// Pass the combined transformation matrix to the shader
+		glUniformMatrix4fv(model_loc, 1, GL_FALSE, (const GLfloat*)player_model.transform_matrix);  // Use combined_transform here
+
+		// Draw the mesh with the combined transformation
+		draw_manager_draw(&p_drawable, player_model.meshes[i]->name);
+	}
+
 	// ! DEBUG LIGHT CUBE
 	shader_use(&DebugLightCube.shader_program);
 
@@ -157,7 +325,7 @@ void default_scene_update(Scene* self) {
 	set_debug_cube_projection_matrix(&DebugLightCube, projection);
 
 	draw_debug_cube(&DebugLightCube);
-
+	
 	// Use image shader program
 	shader_use(&image_shader);
 
@@ -232,118 +400,66 @@ void default_scene_update(Scene* self) {
 }
 
 void default_scene_render(Scene* self) {
-	// Compile shaders and create shader program
-    char* vertexShaderSource = read_file("resources/shaders/vertex.glsl");
-    char* fragmentShaderSource = read_file("resources/shaders/fragment.glsl");
-    if (!vertexShaderSource || !fragmentShaderSource) {
-        fprintf(stderr, "Failed to load shader sources!\n");
-        return;
-    }
+	// * Setup the shaders of the scene
+	setup_default_scene_shaders();
 
-    shader = shader_create(vertexShaderSource, fragmentShaderSource);
-    free(vertexShaderSource);
-    free(fragmentShaderSource);
-
-    if (shader.id == 0) {
-        fprintf(stderr, "Shader program creation failed!\n");
-        return;
-    }
-    printf("Main shader program created.\n");
-
-	// Initialize text renderer
-	// Compile shaders and create shader program
-    char* t_vertexShaderSource = read_file("resources/shaders/text/vertex.glsl");
-    char* t_fragmentShaderSource = read_file("resources/shaders/text/fragment.glsl");
-    if (!t_vertexShaderSource || !t_fragmentShaderSource) {
-        fprintf(stderr, "Failed to load text shader sources!\n");
-        return;
-    }
-
-	text_shader = shader_create(t_vertexShaderSource, t_fragmentShaderSource);
-    free(t_vertexShaderSource);
-    free(t_fragmentShaderSource);
-
-    if (text_shader.id == 0) {
-        fprintf(stderr, "Shader program creation failed!\n");
-        return;
-    }
-    printf("Text shader program created.\n");
-
-	// Initialize image renderer
-	// Compile shaders and create shader program
-    char* i_vertexShaderSource = read_file("resources/shaders/image/vertex.glsl");
-    char* i_fragmentShaderSource = read_file("resources/shaders/image/fragment.glsl");
-    if (!i_vertexShaderSource || !i_fragmentShaderSource) {
-        fprintf(stderr, "Failed to load image shader sources!\n");
-        return;
-    }
-
-	image_shader = shader_create(i_vertexShaderSource, i_fragmentShaderSource);
-    free(i_vertexShaderSource);
-    free(i_fragmentShaderSource);
-
-    if (image_shader.id == 0) {
-        fprintf(stderr, "Shader program creation failed!\n");
-        return;
-    }
-    printf("Image shader program created.\n");
-
-	// Initialize image renderer
-	// Compile shaders and create shader program
-    char* b_vertexShaderSource = read_file("resources/shaders/button/vertex.glsl");
-    char* b_fragmentShaderSource = read_file("resources/shaders/button/fragment.glsl");
-    if (!b_vertexShaderSource || !b_fragmentShaderSource) {
-        fprintf(stderr, "Failed to load image shader sources!\n");
-        return;
-    }
-
-	button_shader = shader_create(b_vertexShaderSource, b_fragmentShaderSource);
-    free(b_vertexShaderSource);
-    free(b_fragmentShaderSource);
-
-    if (button_shader.id == 0) {
-        fprintf(stderr, "Shader program creation failed!\n");
-        return;
-    }
-    printf("Button shader program created.\n");
-
-	// ! LOAD GLTF MODEL HERE
+	// ! Test Multi-mesh Model
     if (!model_load_gltf(
 		&model, 
 		"resources/static/copyrighted/anime_girl_texture/agirl.gltf",
 		true)
 	) {
-        fprintf(stderr, "Failed to load GLTF model!\n");
+        fprintf(stderr, "Failed to load Agirl GLTF model!\n");
         return;
     }
-    printf("Loaded gltf model!\n");
+    printf("[GLTF] Loaded anime_girl_texture/agirl.gltf model.\n");
 
-	// model_set_position(&model, GLM_VEC3_ZERO);
 	model_set_scale(&model, (vec3){ 0.5f, 0.5f, 0.5f });
 	model_set_rotation(&model, (vec4){ -90.0f, 0.0f, 0.0f, 1.0f });
 	model_apply_transform(&model);
 
 	// Initialize the meshes as drawables
-    for (int i = 0; i < model.mesh_count; i++) {
-        // Initialize drawable for each mesh
+    for (int i = 0; i < model.mesh_count; i++)
         draw_manager_init_from_mesh(&drawable, model.meshes[i], model.meshes[i]->name);
-    }
 
+	// ! Player Character Model
+    if (!model_load_gltf(
+		&player_model, 
+		"resources/static/cylinder.glb",
+		false)
+	) {
+        fprintf(stderr, "Failed to load Cylinder GLTF model!\n");
+        return;
+    }
+    printf("[GLTF] Loaded static/cylinder.glb model.\n");
+
+	model_set_scale(&player_model, (vec3){ 0.3f, 0.3f, 0.3f });
+	model_set_rotation(&player_model, (vec4){ -90.0f, 0.0f, 0.0f, 1.0f });
+	model_apply_transform(&player_model);
+
+	// * Initialize the meshes as drawables
+    for (int i = 0; i < player_model.mesh_count; i++)
+        draw_manager_init_from_mesh(&p_drawable, player_model.meshes[i], player_model.meshes[i]->name);
+
+	// * Make stbi flip the image vertically
 	stbi_set_flip_vertically_on_load(1);
 
+	// * Initialize Main Scene Camera
 	camera_init(&camera, (vec3){0.0f, 0.0f, 3.0f}, (vec3){0.0f, 1.0f, 0.0f}, -90.0f, 0.0f);
     printf("Camera initialized.\n");
 
+	// * Initialize the Crosshair
 	crosshair_init(&crosshair, crosshairSize, crosshairThickness, crosshairColor);
 
-	// Initialize Font
+	// * Initialize VCR_OSD_MONO Font
     font_init(&font, "resources/vcr_osd_mono.ttf", font_size, 3.0f, text_shader.id);  // Adjust path and size as needed
 
-	// Initialize background image
+	// * Initialize Image
 	image_init(&background_image, "resources/prototype/image.png", image_shader.id);
 	image_set_dimensions(&background_image, 1024, 1024);
 	printf("Initialized background_image\n");
 
+	// * Initialize Button
 	button_init(
 		&my_button, "Hover me", 
 		100.0f, 100.0f, 200.0f, 60.0f, 
@@ -352,6 +468,7 @@ void default_scene_render(Scene* self) {
 		&font, (vec3){1.0f, 1.0f, 1.0f}
 	);
 
+	// * Initialize Sound System;
 	sound_initialize();
 	alGenBuffers(1, &sound.buffer);
 	alGenSources(1, &sound.source);
@@ -366,11 +483,10 @@ void default_scene_render(Scene* self) {
 	// Attach the buffer to the source
 	sound_attach_buffer(&sound);
 
-	// Initialize sound properties
-	sound_set_volume(&sound, 1.0f);
+	// * Initialize sound properties
+	sound_set_volume(&sound, 0.0f);
 
 	// ! Debug light cube
-
 	// * Create the cube shaders
 	create_debug_cube_shaders(
 		&DebugLightCube, 
@@ -387,18 +503,68 @@ void default_scene_render(Scene* self) {
 
 	// ! Light
 	create_light(&PointLight, shader.id);
+
+	// ! Skybox
+	const char* faces[6] = {
+		"resources/static/cubemap/px.png", // Positive X
+		"resources/static/cubemap/nx.png", // Negative X
+		"resources/static/cubemap/py.png", // Positive Y
+		"resources/static/cubemap/ny.png", // Negative Y
+		"resources/static/cubemap/pz.png", // Positive Z
+		"resources/static/cubemap/nz.png"  // Negative Z
+	};
+
+	// * Stop stbi from flipping the image vertically
+	stbi_set_flip_vertically_on_load(0);
+	skybox_init(&skybox, faces, skybox_shader.id);
 }
 
 void default_scene_cleanup() {
-	// Clean up resources
+	// ** Clean up resources **
+
+	// & >>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+	// * Destroy sound objects
+	sound_cleanup();
+
+	// & >>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+	// * Destroy UI Components
+	button_cleanup(&my_button);
 	image_cleanup(&background_image);
 	font_cleanup(&font);
-	model_free(&model);
-	draw_manager_destroy(&drawable);
-	sound_cleanup();
 	crosshair_destroy(&crosshair);
+
+	// & >>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+	// * Destroy drawables
+	model_free(&model);
+	model_free(&player_model);
+
+	draw_manager_destroy(&drawable);
+	draw_manager_destroy(&p_drawable);
+
+	// & >>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+	// * Destroy Skybox
+	skybox_destroy(&skybox);
+
+	// & >>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+	// * Destroy Shaders
     shader_destroy(&shader);
+	
+    shader_destroy(&image_shader);
+    shader_destroy(&text_shader);
+    shader_destroy(&button_shader);
+    shader_destroy(&skybox_shader);
+
+	// & >>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+	// * Destroy Buffers
     buffers_destroy(&buffers);
-    glDeleteTextures(1, &texture);
+
+	// & >>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
     printf("Resources cleaned up.\n");
 }

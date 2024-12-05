@@ -78,13 +78,24 @@ char *find_file_in_directory(const char *base_dir, const char *target_file) {
     return NULL; // File not found in this directory or its subdirectories
 }
 
+#define MAX_TEXTURES 1024
+
+// Structure to store both the texture path and its OpenGL texture ID
+typedef struct {
+    char* uri;
+    GLuint texture_id;
+} LoadedTexture;
+
+// Array to store the loaded textures
+static LoadedTexture loaded_textures[MAX_TEXTURES];
+static int texture_count = 0;
+
+
 // Function to load a texture from a GLTF texture structure
 GLuint load_texture_from_gltf(cgltf_texture *gltf_texture, const char *model_path) {
     // Get parent directory from the model path
     char parent_dir[1024];
     get_parent_directory(model_path, parent_dir);
-
-    printf("Parent directory: %s\n", parent_dir);
 
     // Get the texture URI from the GLTF texture structure
     cgltf_image *gltf_image = gltf_texture->image;
@@ -93,18 +104,22 @@ GLuint load_texture_from_gltf(cgltf_texture *gltf_texture, const char *model_pat
         return 0;
     }
 
-    // Find the texture file in the directory
-    char *texture_path = find_file_in_directory(parent_dir, gltf_image->uri);
-    if (!texture_path) {
-        printf("Texture file not found: %s\n", gltf_image->uri);
-        return 0;
+    // Check if this texture has already been loaded
+    for (int i = 0; i < texture_count; i++) {
+        if (strcmp(loaded_textures[i].uri, gltf_image->uri) == 0) {
+            // Texture is already loaded, return the cached texture ID
+            // printf("[TEXTURE] SKIPPING LOADING (CACHED) TEXTURE WITH PATH \"%s\"\n", gltf_image->uri);
+            return loaded_textures[i].texture_id;
+        }
     }
+
+    // Find the texture file in the directory
+    char texture_path[1024];
+    snprintf(texture_path, sizeof(texture_path), "%s/%s", parent_dir, gltf_image->uri);
 
     // Load texture data
     int width, height, channels;
     unsigned char *data = stbi_load(texture_path, &width, &height, &channels, 0);
-    free(texture_path); // Free the path string after use
-
     if (!data) {
         printf("Failed to load texture data: %s\n", gltf_image->uri);
         return 0; // Return 0 if texture loading fails
@@ -122,11 +137,17 @@ GLuint load_texture_from_gltf(cgltf_texture *gltf_texture, const char *model_pat
     glBindTexture(GL_TEXTURE_2D, 0);
     stbi_image_free(data);
 
-    printf("Successfully loaded texture: %s\n", gltf_image->uri);
+    // Cache the loaded texture path and its OpenGL texture ID
+    if (texture_count < MAX_TEXTURES) {
+        loaded_textures[texture_count].uri = strdup(gltf_image->uri); // Copy the texture path into the array
+        loaded_textures[texture_count].texture_id = texture_id; // Store the texture ID
+        texture_count++;
+    }
+
+    printf("[TEXTURE] LOADED TEXTURE WITH PATH \"%s\"\n", gltf_image->uri);
     return texture_id;
 }
 
-// Function to create a GL texture from a file path and assigns it to texture_id_dest
 int material_create_gl_texture(cgltf_texture* texture, MaterialTextureType type, GLuint* texture_id_dest, const char* model_path) {
     // Attempt to load the texture and assign it to the destination
     GLuint texture_id = load_texture_from_gltf(texture, model_path);  // For simplicity, skipping the GLTF data

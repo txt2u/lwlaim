@@ -30,6 +30,14 @@ uniform vec3 cameraPosition;
 
 uniform Light light;
 
+vec3 srgbToLinear(vec3 color) {
+    return mix(pow(color, vec3(2.4)), color / 12.92, lessThanEqual(color, vec3(0.04045)));
+}
+
+vec3 linearToSrgb(vec3 color) {
+    return mix(12.92 * color, (1.055 * pow(color, vec3(1.0 / 2.4))) - 0.055, lessThanEqual(color, vec3(0.0031308)));
+}
+
 void main() {
     // Default values for material properties
     vec3 baseColor = diffuseColor.rgb;  // Default to uniform diffuse color
@@ -64,7 +72,7 @@ void main() {
         occlusion = texture(occlusionTexture, fragTexCoord).r;
     }
 
-	float ambientStrength = 0.2;
+	float ambientStrength = 0.1846;
     vec3 ambient = ambientStrength * vec3(1.0);
 
 	vec3 norm = normalize(fragNormal);
@@ -73,8 +81,8 @@ void main() {
 	float diff = max(dot(norm, lightDir), 0.0);
 	vec3 diffuse = diff * light.color;
 
-	float specularStrength = 0.2;
-	float specularExponent = 10.0; // Soft, subtle specular highlight for skin
+	float specularStrength = 0.4;
+	float specularExponent = 24.0; // Soft, subtle specular highlight for skin
 	vec3 viewDir = normalize(cameraPosition - fragPosition);
 	vec3 reflectDir = reflect(-lightDir, norm);  
 

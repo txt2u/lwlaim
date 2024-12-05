@@ -10,7 +10,7 @@ void camera_init(Camera* camera, vec3 position, vec3 up, float yaw, float pitch)
     glm_cross(camera->right, camera->front, camera->up);
     camera->movementSpeed = 2.5f;
     camera->mouseSensitivity = 0.1f;
-    camera->fov = 80.0f;
+    camera->fov = 60.0f;
 
 	camera->near = 0.01f;
 	camera->far = 800.0f;
@@ -111,6 +111,10 @@ void camera_get_view_matrix(Camera* camera, mat4 view) {
     glm_lookat(camera->position, target, camera->up, view); // Pass the target vector to glm_lookat
 }
 
-void camera_get_projection_matrix(Camera* camera, mat4 projection, int width, int height) {
-    glm_perspective(glm_rad(camera->fov), (float)width / (float)height, camera->near, camera->far, projection);
+void camera_get_view_matrix_without_orientation(Camera* camera, mat4 view) {
+    glm_lookat(camera->position, camera->up, camera->up, view); // Pass the target vector to glm_lookat
+}
+
+void camera_get_projection_matrix(Camera* camera, mat4 projection, float width, float height) {
+    glm_perspective(glm_rad(camera->fov), width / height, camera->near, camera->far, projection);
 }

@@ -32,13 +32,13 @@ static Material *load_material_from_gltf(cgltf_material *gltf_material, const ch
     material->roughness = 1.0f;                                           // Default roughness
 
 	// Load diffuse texture
-	if (gltf_material->pbr_metallic_roughness.base_color_texture.texture) {
+	if (gltf_material->pbr_metallic_roughness.base_color_texture.texture && !material->diffuse_texture_id) {
 		cgltf_texture *base_color_texture = gltf_material->pbr_metallic_roughness.base_color_texture.texture;
 		material->diffuse_texture_id = load_texture_from_gltf(base_color_texture, model_path);
 		if (!material->diffuse_texture_id) {
 			printf("Warning: Failed to load diffuse texture.\n");
 		} else {
-			printf("Success: Made diffuse texture with the following id \"%i\"\n", material->diffuse_texture_id);
+			// printf("[MATERIAL->TEXTURE] MADE DIFFUSE TEXTURE WITH ID \"%i\"\n", material->diffuse_texture_id);
 		}
 	} else {
 		printf("No diffuse texture defined in material.\n");
@@ -245,7 +245,6 @@ static Mesh *load_mesh_from_gltf(cgltf_mesh *gltf_mesh, const cgltf_data *gltf_d
     return mesh;
 }
 
-
 // Model transformation functions
 void model_set_position(Model *model, vec3 new_position) {
     glm_vec3_copy(new_position, model->position);  // Copy the new position into the model
@@ -255,38 +254,30 @@ void model_set_scale(Model *model, vec3 new_scale) {
     glm_vec3_copy(new_scale, model->scale);  // Copy the new scale into the model
 }
 
-void model_set_rotation(Model *model, versor rotation) {
-    glm_quat_copy(rotation, model->rotation);  // Copy the quaternion into the model
+void model_set_rotation(Model *model, versor new_rotation) {
+    glm_quat_copy(new_rotation, model->rotation);  // Copy the new quaternion rotation into the model
 }
 
-// Rotation quat
+// Create a rotation quaternion from axis and angle
 void create_rotation_quaternion(versor q, vec3 axis, float angle) {
     glm_quatv(q, angle, axis);  // Create a quaternion from the axis and angle
 }
 
+// Apply transformations to the model's transform matrix and meshes
 void model_apply_transform(Model *model) {
-    // Ensure scale has safe default values
-    if (model->scale[0] == 0.0f && model->scale[1] == 0.0f && model->scale[2] == 0.0f) {
-        model->scale[0] = 1.0f;
-        model->scale[1] = 1.0f;
-        model->scale[2] = 1.0f;
-    }
-
     // Start with the identity matrix
     glm_mat4_identity(model->transform_matrix);
 
-    // Combine transformations in the correct order: scale -> rotate -> translate
+    // Apply translation
+    glm_translate(model->transform_matrix, model->position);
 
     // Apply scale
     glm_scale(model->transform_matrix, model->scale);
 
-    // Apply rotation
+    // Apply rotation using quaternion (no need to apply axis-by-axis)
     glm_rotate(model->transform_matrix, glm_rad(model->rotation[0]), (vec3){1.0f, 0.0f, 0.0f});
     glm_rotate(model->transform_matrix, glm_rad(model->rotation[1]), (vec3){0.0f, 1.0f, 0.0f});
     glm_rotate(model->transform_matrix, glm_rad(model->rotation[2]), (vec3){0.0f, 0.0f, 1.0f});
-
-    // Apply translation
-    glm_translate(model->transform_matrix, model->position);
 }
 
 // GLTF loading function

@@ -26,7 +26,8 @@ void camera_update(Camera* camera);
 void camera_process_keyboard(Camera* camera, GLFWwindow* window, float deltaTime);
 void camera_process_mouse(Camera* camera, double xpos, double ypos);
 void camera_get_view_matrix(Camera* camera, mat4 view);
-void camera_get_projection_matrix(Camera* camera, mat4 projection, int width, int height);
+void camera_get_view_matrix_without_orientation(Camera* camera, mat4 view);
+void camera_get_projection_matrix(Camera* camera, mat4 projection, float width, float height);
 
 void get_camera_directions(Camera* camera, float* camera_x, float* camera_y, float* camera_z);
 
